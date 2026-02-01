@@ -14,6 +14,8 @@ import com.freeclassroom.userservice.dto.response.user.UserResponse;
 import com.freeclassroom.userservice.service.certificate.CertificateService;
 import com.freeclassroom.userservice.service.certificate.ICertificateService;
 import com.freeclassroom.userservice.service.user.IUserService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +24,15 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.redis.connection.stream.RecordId;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_GUEST;
+import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_USER;
 
 @RestController
 @RequestMapping("/user")
@@ -108,23 +115,54 @@ public class UserController {
                                  HttpServletRequest request) {
         Identity identity = (Identity) request.getAttribute("IDENTITY");
 
-        if (identity != null) {
-            System.out.println("Type: " + identity.getType());
-            System.out.println("ID: " + identity.getId());
+        if (identity == null) {
+            return ApiResponse.<Void>builder()
+                    .code(401)
+                    .message("Missing identity")
+                    .build();
         }
 
         // redis stream logic to track event
-        String stream = identity.getType().equals("USER") ? "event:user" : "event:guest";
+        String stream = identity.getType().equals("USER") ? EVENT_USER.getValue() : EVENT_GUEST.getValue();
 
-        redis.opsForStream().add(
-                stream,
+
+        // if user save database ()
+
+        // merge when guest login to user ()
+        
+        String payloadJson = "";
+        if (trackingEvent != null && trackingEvent.getPayload() != null && !trackingEvent.getPayload().isEmpty()) {
+            try {
+                payloadJson = new ObjectMapper().writeValueAsString(trackingEvent.getPayload());
+            } catch (JsonProcessingException ignored) {
+                payloadJson = "";
+            }
+        }
+
+        String eventName = trackingEvent != null && trackingEvent.getEventName() != null
+                ? trackingEvent.getEventName()
+                : "";
+
+        String streamFormat = stream + ":" + identity.getId();
+
+        RecordId recordId = redis.opsForStream().add(
+                streamFormat,
                 Map.of(
                        "userId", identity.getId(),
-                        "eventName", trackingEvent.getEventName(),
-                        "payload", trackingEvent.getPayload(),
-                        "createdAt", System.currentTimeMillis()
+                        "eventName", eventName,
+                        "payload", payloadJson,
+                        "createdAt", String.valueOf(System.currentTimeMillis())
                 )
         );
+
+        redis.expire(streamFormat, Duration.ofDays(7));
+
+        if (recordId == null) {
+            return ApiResponse.<Void>builder()
+                .code(500)
+                .message("Failed to write event to redis stream")
+                .build();
+        }
 
         return ApiResponse.<Void>builder()
                 .message("Personal event tracked successfully")
