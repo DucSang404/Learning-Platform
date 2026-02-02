@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -47,6 +48,10 @@ public class GuestEventConsumer {
         String eventName = values.get("eventName").toString();
         String payload = values.get("payload").toString();
 
+        if (userId.startsWith("guest-")) {
+            userId = userId.substring("guest-".length());
+        }
+
         if (eventName.equals("VIEW_COURSE")) {
             String courseId = extractCourseId(payload);
 
@@ -57,6 +62,9 @@ public class GuestEventConsumer {
                     "view_course_" + courseId,
                     1L
             );
+
+            // Keep guest features for a limited time; refreshed on activity.
+            redis.expire(key, Duration.ofDays(30));
         }
     }
 

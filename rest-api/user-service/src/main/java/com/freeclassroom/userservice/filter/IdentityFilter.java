@@ -27,6 +27,15 @@ public class IdentityFilter extends OncePerRequestFilter {
     private String cookieName;
     private final JwtUtils jwtUtils;
 
+    private String normalizeGuestId(String rawGuestId) {
+        if (rawGuestId == null) return null;
+        String trimmed = rawGuestId.trim();
+        if (trimmed.startsWith("guest-")) {
+            return trimmed.substring("guest-".length());
+        }
+        return trimmed;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -67,13 +76,23 @@ public class IdentityFilter extends OncePerRequestFilter {
         }
 
         if(guestId == null) {
-            guestId = "guest-" + UUID.randomUUID();
+            guestId = UUID.randomUUID().toString();
 
             Cookie cookie = new Cookie(cookieName, guestId);
             cookie.setHttpOnly(true);
             cookie.setPath("/");
             cookie.setMaxAge(60 * 60 * 24 * 30); // 30 days
             response.addCookie(cookie);
+        } else {
+            String normalized = normalizeGuestId(guestId);
+            if (normalized != null && !normalized.equals(guestId)) {
+                guestId = normalized;
+                Cookie cookie = new Cookie(cookieName, guestId);
+                cookie.setHttpOnly(true);
+                cookie.setPath("/");
+                cookie.setMaxAge(60 * 60 * 24 * 30); // 30 days
+                response.addCookie(cookie);
+            }
         }
 
         Identity identity = Identity.builder()

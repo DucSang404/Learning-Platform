@@ -2,7 +2,11 @@ package com.freeclassroom.userservice.service.user;
 
 import com.example.grpc.course.GetCourseAdminDataResponse;
 import com.example.grpc.course.TotalBlogResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freeclassroom.userservice.configuration.RabbitMQConfig;
+import com.freeclassroom.userservice.dto.request.auth.Identity;
+import com.freeclassroom.userservice.dto.request.personal.TrackingEventRequest;
 import com.freeclassroom.userservice.dto.request.user.CreationUserRequest;
 import com.freeclassroom.userservice.dto.request.user.UpdateUserRequest;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
@@ -32,16 +36,25 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.connection.DataType;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_GUEST;
+import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_USER;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +71,7 @@ public class UserService implements IUserService {
     // template rabbitmq
     RabbitTemplate rabbitTemplate;
     RabbitMQConfig rabbitMQConfig;
+    StringRedisTemplate redis;
 
     RedisOperations<String, OTPForgetPassword> redisOps;
 
@@ -74,6 +88,15 @@ public class UserService implements IUserService {
 
     private final UserRepository userRepository;
     private final CertificateRepository certificateRepository;
+
+    private String normalizeGuestId(String rawGuestId) {
+        if (rawGuestId == null) return null;
+        String trimmed = rawGuestId.trim();
+        if (trimmed.startsWith("guest-")) {
+            return trimmed.substring("guest-".length());
+        }
+        return trimmed;
+    }
 
     public ApiResponse<UserResponse> registerUser(CreationUserRequest request) {
         // check user exits
@@ -316,6 +339,130 @@ public class UserService implements IUserService {
                     .build();
         }
     }
+
+    @Override
+    public ApiResponse<Void> trackingEvent(Identity identity, TrackingEventRequest trackingEvent) {
+        if (identity == null) {
+            return ApiResponse.<Void>builder()
+                    .code(401)
+                    .message("Missing identity")
+                    .build();
+        }
+
+        // redis stream logic to track event
+        boolean isUser = "USER".equals(identity.getType());
+        String normalizedId = isUser ? identity.getId() : normalizeGuestId(identity.getId());
+        String stream = isUser ? EVENT_USER.getValue() : EVENT_GUEST.getValue();
+
+        // if user save database ()
+
+        // merge when guest login to user ()
+
+        if (trackingEvent != null && trackingEvent.getEventName() != null) {
+            String event = trackingEvent.getEventName();
+            if ("VIEW_COURSE".equals(event) && trackingEvent.getPayload() != null) {
+                String courseId = trackingEvent.getPayload().get("courseId");
+                if (courseId != null && !courseId.isBlank() && normalizedId != null && !normalizedId.isBlank()) {
+                    String featuresKey = isUser
+                            ? ("user:" + normalizedId + ":features")
+                            : ("guest:" + normalizedId + ":features");
+
+                    redis.opsForHash().increment(featuresKey, "view_course_" + courseId, 1d);
+
+                    if (!isUser) {
+                        redis.expire(featuresKey, Duration.ofDays(30));
+                    }
+                }
+            }
+        }
+
+        String payloadJson = "";
+        if (trackingEvent != null && trackingEvent.getPayload() != null && !trackingEvent.getPayload().isEmpty()) {
+            try {
+                payloadJson = new ObjectMapper().writeValueAsString(trackingEvent.getPayload());
+            } catch (JsonProcessingException ignored) {
+                payloadJson = "";
+            }
+        }
+
+        String eventName = trackingEvent != null && trackingEvent.getEventName() != null
+                ? trackingEvent.getEventName()
+                : "";
+
+        String streamKey = stream;
+
+        RecordId recordId = redis.opsForStream().add(
+            streamKey,
+                Map.of(
+                "userId", normalizedId == null ? "" : normalizedId,
+                        "eventName", eventName,
+                        "payload", payloadJson,
+                        "createdAt", String.valueOf(System.currentTimeMillis())
+                )
+        );
+
+        // Limit 10000 record lastest
+        redis.opsForStream().trim(streamKey, 10_000);
+
+        if (recordId == null) {
+            return ApiResponse.<Void>builder()
+                    .code(500)
+                    .message("Failed to write event to redis stream")
+                    .build();
+        }
+
+        return ApiResponse.<Void>builder()
+                .message("Personal event tracked successfully")
+                .build();
+    }
+
+    public void mergeGuestToUser(String guestId, String userId) {
+        if (guestId == null || guestId.isBlank() || userId == null || userId.isBlank()) {
+            return;
+        }
+
+        String normalizedGuestId = normalizeGuestId(guestId);
+        if (normalizedGuestId == null || normalizedGuestId.isBlank()) {
+            return;
+        }
+
+        String guestFeaturesKey = "guest:" + normalizedGuestId + ":features";
+        String legacyGuestFeaturesKey = "guest:guest-" + normalizedGuestId + ":features";
+        String userFeaturesKey = "user:" + userId + ":features";
+
+        DataType keyType = redis.type(guestFeaturesKey);
+        if (keyType == null || DataType.NONE.equals(keyType) || !DataType.HASH.equals(keyType)) {
+            DataType legacyType = redis.type(legacyGuestFeaturesKey);
+            if (legacyType == null || DataType.NONE.equals(legacyType) || !DataType.HASH.equals(legacyType)) {
+                return;
+            }
+            guestFeaturesKey = legacyGuestFeaturesKey;
+        }
+
+        Map<Object, Object> guestFeatures = redis.opsForHash().entries(guestFeaturesKey);
+        if (guestFeatures == null || guestFeatures.isEmpty()) {
+            return;
+        }
+
+        guestFeatures.forEach((feature, score) -> {
+            String field = feature == null ? "" : feature.toString();
+            if (field.isBlank() || score == null) return;
+
+            double delta;
+            try {
+                delta = Double.parseDouble(score.toString());
+            } catch (NumberFormatException e) {
+                return;
+            }
+
+            if (delta == 0d) return;
+
+            redis.opsForHash().increment(userFeaturesKey, field, delta);
+        });
+
+        redis.delete(guestFeaturesKey);
+    }
+
 
     public ApiResponse<UserResponse> verifyForgotPassword(String code, String newPassword) {
         // get token in redis
