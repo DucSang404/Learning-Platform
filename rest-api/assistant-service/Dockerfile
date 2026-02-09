@@ -9,7 +9,7 @@ WORKDIR /app
 COPY assistant-service/package*.json ./
 
 # Install all dependencies (including dev for build tools)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code and config
 COPY assistant-service/src ./src
