@@ -37,10 +37,7 @@ const TeacherInfo = ({ teacher }: { teacher: Teacher }) => {
       <CardContent className='p-6'>
         <div className='flex flex-col md:flex-row gap-6'>
           {/* Teacher Avatar and Basic Info */}
-          <div
-            className='flex flex-col items-center md:items-start gap-4 md:w-1/3 cursor-pointer'
-            onClick={() => navigate(`/instructor/${teacher.id}`)}
-          >
+          <div className='flex flex-col items-center md:items-start gap-4 md:w-1/3'>
             <Avatar className='w-20 h-20 shadow-lg'>
               <AvatarImage src={teacher?.image} alt={teacher?.name} />
               <AvatarFallback className='text-2xl font-semibold bg-gradient-primary text-primary-foreground'>
