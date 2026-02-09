@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, MouseEvent } from 'react'
 import { CourseCard } from '@/components/AllCourse/CourseCard'
 import CourseCardListSkeleton from '@/components/AllCourse/CourseCardListSkeleton'
 import { FilterSidebar } from '@/components/AllCourse/FilterSidebar'
 import { SortBar } from '@/components/AllCourse/SortBar'
-import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import CustomPagination from '@/components/common/Pagination/CustomPagination'
 import instructorAvatar from '@/assets/images/course.jpg'
 import courseService from '@/services/course/course-user.service'
 import useDebounce from '@/hooks/useDebounce.hook'
@@ -144,34 +143,12 @@ const Index = () => {
           </div>
 
           <div className='flex items-center justify-center gap-2'>
-            <Button
-              variant='outline'
-              size='icon'
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1 || loading}
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </Button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <Button
-                key={page}
-                variant={currentPage === page ? 'default' : 'outline'}
-                size='icon'
-                onClick={() => !loading && setCurrentPage(page)}
-              >
-                {page}
-              </Button>
-            ))}
-
-            <Button
-              variant='outline'
-              size='icon'
-              onClick={() => !loading && setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages || loading}
-            >
-              <ChevronRight className='h-4 w-4' />
-            </Button>
+            <CustomPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              loading={loading}
+            />
           </div>
         </div>
       </main>
