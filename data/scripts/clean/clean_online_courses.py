@@ -47,6 +47,9 @@ def clean_courses(input_file, output_file):
             # Prepare output header
             output_headers = list(columns_mapping.values())
             output_headers.append('thumbnail_url')
+            output_headers.append('introductory_video')
+            output_headers.append('final_price')
+            output_headers.append('original_price')
             
             with open(output_file, 'w', encoding='utf-8', newline='') as outfile:
                 writer = csv.DictWriter(outfile, fieldnames=output_headers)
@@ -80,6 +83,13 @@ def clean_courses(input_file, output_file):
                     # Pattern: https://picsum.photos/seed/course_xxxx/1280/720
                     cleaned_row['thumbnail_url'] = f"https://picsum.photos/seed/course_{rows_processed+1:04d}/1280/720"
                     
+                    # Add introductory_video with default value
+                    cleaned_row['introductory_video'] = "https://core-learnova.t9tieanh.io.vn/api/v1/learning/storage/1769169333825-What_is_Docker_in_5_minutes.mp4"
+                    
+                    # Add default prices
+                    cleaned_row['final_price'] = 194000
+                    cleaned_row['original_price'] = 300000
+
                     writer.writerow(cleaned_row)
                     rows_processed += 1
                     
