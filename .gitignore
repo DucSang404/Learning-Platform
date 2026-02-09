@@ -19,4 +19,8 @@ key
 
 .agent
 
+data
+
 n8n/workflows
+data/
+*.bson
