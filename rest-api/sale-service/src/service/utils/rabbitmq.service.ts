@@ -1,4 +1,4 @@
-import amqp, { Channel } from 'amqplib'
+import amqp, { Channel, ChannelModel } from 'amqplib'
 import { QueueNameEnum } from '../../enums/emailType.enum'
 import { NotificationDto } from '../../dto/request/notification.dto'
 import Logger from '../../utils/logger'
@@ -14,13 +14,22 @@ const RabbitMQConf = {
   uri: process.env.RABBIT_MQ_URI || null
 }
 
+interface ConsumerDef {
+  queue: string
+  exchange?: string
+  routingKeys?: string | string[]
+  handler: (envelope: any) => Promise<void>
+  exchangeType?: 'topic' | 'direct' | 'fanout'
+}
+
 class RabbitClient {
   private static instance: RabbitClient
-  private static connection: any | null = null
+  private static connection: ChannelModel | null = null
   private static channel: Channel | null = null
+  private static isConnecting = false
+  private static consumers: ConsumerDef[] = []
 
-  private constructor() {
-  }
+  private constructor() { }
 
   // Singleton accessor
   public static async getInstance(): Promise<RabbitClient> {
@@ -31,57 +40,127 @@ class RabbitClient {
     return RabbitClient.instance
   }
 
-  // generic function handler event
+  // Generic event handler function
+  // Note: Only used internally or if specific ad-hoc consuming is needed. 
+  // Prefer registerConsumer for auto-reconnection support.
   private static consumeQueue<T>(queue: QueueNameEnum, handler: (parsed: T) => Promise<void>) {
     RabbitClient.channel?.consume(queue, async (data) => {
       if (!data) return
       try {
         Logger.info(data.content.toString());
         const parsed: T & { type?: string } = JSON.parse(data.content.toString())
-        parsed.type = queue // Gán type cho parsed để biết queue nào đã gửi message
+        parsed.type = queue
 
         await handler(parsed)
         RabbitClient.channel?.ack(data)
       } catch (err) {
-        Logger.error(`Lỗi xử lý message ở queue ${queue}: ${err}`)
+        Logger.error(`Error processing message in queue ${queue}: ${err}`)
         RabbitClient.channel?.nack(data, false, true)
       }
     })
   }
 
-  // Tạo kết nối và channel -> đăng ký consumer để lắng nghe data trên queue
+  // Create connection and channel -> register consumers
   private static async createConnection(): Promise<void> {
+    if (this.isConnecting) return
+    this.isConnecting = true
+
     try {
       const uri = RabbitMQConf.uri || `${RabbitMQConf.protocol}://${RabbitMQConf.username}:${RabbitMQConf.password}@${RabbitMQConf.hostname}:${RabbitMQConf.port}${RabbitMQConf.vhost}`
-      RabbitClient.connection = await amqp.connect(uri)
-      RabbitClient.channel = await RabbitClient.connection.createChannel()
 
-      // Đảm bảo queue tồn tại
+      Logger.info('Attempting to connect to RabbitMQ...')
+      RabbitClient.connection = await amqp.connect(uri)
+
+      // Handle connection events
+      RabbitClient.connection.on('error', (err) => {
+        Logger.error(`RabbitMQ Connection Error: ${err}`)
+      })
+
+      RabbitClient.connection.on('close', () => {
+        Logger.warn('RabbitMQ Connection Closed so re-connecting...')
+        RabbitClient.connection = null
+        RabbitClient.channel = null
+        RabbitClient.scheduleReconnect()
+      })
+
+      RabbitClient.channel = await RabbitClient.connection.createChannel()
+      RabbitClient.channel.on('error', (err) => {
+        Logger.error(`RabbitMQ Channel Error: ${err}`)
+      })
+
       if (!RabbitClient.channel) {
         throw new Error('RabbitMQ channel is not initialized')
       }
-      //await RabbitClient.channel.assertQueue(QueueNameEnum.ORDER_CONFIRMATION, { durable: true })
 
-      // // register consumer cho queue ORDER_CONFIRMATION
-      // this.consumeQueue<OrderConfirmationData>(QueueNameEnum.ORDER_CONFIRMATION, async (parsed) => {
-      //   await nodemailService.sendMail(parsed as any)
-      // })
+      Logger.info('Connection to RabbitMQ established and Channel created')
 
-      Logger.info('Connection to RabbitMQ established')
+      // Re-setup registered consumers
+      for (const consumer of RabbitClient.consumers) {
+        await RabbitClient.setupConsumer(consumer)
+      }
+
+      this.isConnecting = false
     } catch (error) {
-      Logger.error(`RabbitMQ connection failed: ${error}`)
-      throw new Error('RabbitMQ connection failed')
+      Logger.error(`RabbitMQ connection initial failed: ${error}`)
+      this.isConnecting = false
+      // Retry on failure
+      RabbitClient.scheduleReconnect()
     }
   }
 
-  // Gửi message tới queue
+  private static scheduleReconnect() {
+    setTimeout(async () => {
+      Logger.info('Reconnecting to RabbitMQ...')
+      await RabbitClient.createConnection()
+    }, 5000)
+  }
+
+  // Helper to actually set up the consumer on the channel
+  private static async setupConsumer(consumer: ConsumerDef) {
+    if (!RabbitClient.channel) return
+
+    try {
+      // Optional: Assert queue/exchange here if needed, or rely on them existing/being created elsewhere.
+      // For robustness, asserting queue here is good.
+      await RabbitClient.channel.assertQueue(consumer.queue, { durable: true });
+
+      if (consumer.exchange && consumer.routingKeys) {
+        const keys = Array.isArray(consumer.routingKeys) ? consumer.routingKeys : [consumer.routingKeys]
+        await RabbitClient.channel.assertExchange(consumer.exchange, consumer.exchangeType || 'topic', { durable: true })
+        for (const k of keys) {
+          await RabbitClient.channel.bindQueue(consumer.queue, consumer.exchange, k)
+        }
+      }
+
+      RabbitClient.channel.consume(
+        consumer.queue,
+        async (msg) => {
+          if (!msg) return
+          try {
+            const envelope = JSON.parse(msg.content.toString())
+            await consumer.handler(envelope)
+            RabbitClient.channel?.ack(msg)
+          } catch (err) {
+            Logger.error(`Error processing message from ${consumer.queue}: ${err}`)
+            RabbitClient.channel?.nack(msg, false, false)
+          }
+        },
+        { noAck: false }
+      )
+      Logger.info(`Setup consumer for queue: ${consumer.queue}`)
+    } catch (err) {
+      Logger.error(`Failed to setup consumer ${consumer.queue}: ${err}`)
+    }
+  }
+
+  // Send message to queue
   public static async sendMessage(data: NotificationDto, queueName: QueueNameEnum): Promise<boolean> {
     try {
       if (!RabbitClient.channel) {
-        throw new Error('RabbitMQ channel is not initialized')
+        Logger.error('RabbitMQ channel is not initialized, cannot send message')
+        return false // Or throw, but returning false is safer if we don't want to crash request
       }
 
-      // Đảm bảo queue tồn tại
       await RabbitClient.channel.assertQueue(queueName, { durable: true })
 
       const msgBuffer = Buffer.from(JSON.stringify(data))
@@ -94,7 +173,7 @@ class RabbitClient {
     }
   }
 
-  // Publish message to an exchange (topic/direct/fanout)
+  // Publish message to an exchange
   public static async sendMessageTopic(
     data: any,
     exchange: string,
@@ -104,10 +183,10 @@ class RabbitClient {
   ): Promise<boolean> {
     try {
       if (!RabbitClient.channel) {
-        throw new Error('RabbitMQ channel is not initialized')
+        Logger.error('RabbitMQ channel is not initialized, cannot publish message')
+        return false
       }
 
-      // Ensure exchange exists
       await RabbitClient.channel.assertExchange(exchange, exchangeType, { durable: true })
 
       const payload = Buffer.from(JSON.stringify(data))
@@ -127,7 +206,10 @@ class RabbitClient {
     routingKeys: string | string[],
     exchangeType: 'topic' | 'direct' | 'fanout' = 'topic'
   ): Promise<void> {
-    if (!RabbitClient.channel) throw new Error('RabbitMQ channel is not initialized')
+    if (!RabbitClient.channel) {
+      Logger.warn(`Cannot bind ${queue} to ${exchange}, channel not ready`)
+      return
+    }
     const keys = Array.isArray(routingKeys) ? routingKeys : [routingKeys]
     await RabbitClient.channel.assertExchange(exchange, exchangeType, { durable: true })
     await RabbitClient.channel.assertQueue(queue, { durable: true })
@@ -137,7 +219,7 @@ class RabbitClient {
     Logger.info(`Bound queue ${queue} -> ${exchange} [${keys.join(',')}]`)
   }
 
-  // Register consumer: bind then consume (handler receives parsed envelope)
+  // Register consumer: store definition and setup
   public static async registerConsumer<T = any>(
     queue: string,
     exchange: string,
@@ -145,24 +227,22 @@ class RabbitClient {
     handler: (envelope: { type: string; version?: string; correlationId?: string; payload: T }) => Promise<void>,
     exchangeType: 'topic' | 'direct' | 'fanout' = 'topic'
   ): Promise<void> {
-    if (!RabbitClient.channel) throw new Error('RabbitMQ channel is not initialized')
 
-    //await RabbitClient.bindQueueToExchange(queue, exchange, routingKeys, exchangeType)
+    const consumer: ConsumerDef = {
+      queue,
+      exchange: exchange, // Explicitly passed
+      routingKeys: routingKeys,
+      handler,
+      exchangeType
+    }
 
-    RabbitClient.channel.consume(queue, async (msg) => {
-      if (!msg) return
-      try {
-        const envelope = JSON.parse(msg.content.toString())
-        await handler(envelope)
-        RabbitClient.channel?.ack(msg)
-      } catch (err) {
-        Logger.error(`Error processing message from ${queue}: ${err}`)
-        // nack and move to DLQ or drop depending on your policy
-        RabbitClient.channel?.nack(msg, false, false)
-      }
-    }, { noAck: false })
+    RabbitClient.consumers.push(consumer)
 
-    Logger.info(`Consumer registered on queue ${queue}`)
+    if (RabbitClient.channel) {
+      await RabbitClient.setupConsumer(consumer)
+    } else {
+      Logger.warn(`Channel not ready for ${queue}, will register on connect`)
+    }
   }
 }
 
