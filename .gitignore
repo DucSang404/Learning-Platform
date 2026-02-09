@@ -22,3 +22,5 @@ key
 data
 
 n8n
+data/
+*.bson
