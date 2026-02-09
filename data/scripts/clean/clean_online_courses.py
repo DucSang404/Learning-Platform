@@ -1,6 +1,7 @@
 import csv
 import os
 import re
+import random
 
 def parse_rating(rating_str):
     """
@@ -87,8 +88,10 @@ def clean_courses(input_file, output_file):
                     cleaned_row['introductory_video'] = "https://core-learnova.t9tieanh.io.vn/api/v1/learning/storage/1769169333825-What_is_Docker_in_5_minutes.mp4"
                     
                     # Add default prices
-                    cleaned_row['final_price'] = 194000
-                    cleaned_row['original_price'] = 300000
+                    # Generate a random variance: 0 to 9 * 1000 (e.g., 0, 1000, 2000, ... 9000)
+                    variance = random.randint(0, 9) * 1000
+                    cleaned_row['final_price'] = 194000 + variance
+                    cleaned_row['original_price'] = 300000 + variance
 
                     writer.writerow(cleaned_row)
                     rows_processed += 1

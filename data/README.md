@@ -34,34 +34,80 @@ pip install -r requirements.txt
 The data flows through the following stages:
 
 ### 1. Download (Raw Data)
-Raw data is collected from various sources (e.g., CSV dumps, API responses) and stored in `data/raw/`. This data is treated as immutable.
-*   **Current Source:** `data/raw/online-courses/Online_Courses.csv`
+Raw data is collected from various sources (e.g., CSV dumps).
+*   **Source:** `data/raw/online-courses/Online_Courses.csv`
 
 ### 2. Clean
-We select relevant columns, handle missing values for critical fields, and rename columns to match our internal schema.
+Selects relevant columns, parses ratings, adds default values (prices, thumbnails, video URLs), and renames columns.
 *   **Script:** `scripts/clean/clean_online_courses.py`
-*   **Input:** `data/raw/online-courses/Online_Courses.csv`
 *   **Output:** `data/cleaned/cleaned_courses.csv`
-*   **Operations:**
-    *   Selects: Title, URI, Short Intro, Category, Skills, Instructors, Rating
-    *   Renames columns to lowercase/standardized format
 
-### 3. Normalize (In Progress)
-The next step involves standardizing the cleaned data to ensure consistency across the platform. This will include:
-*   Standardizing skill tags (e.g., "Python 3" -> "Python").
-*   Normalizing instructor names.
-*   Formatting numeric values (ratings, duration).
-*   **Output Location:** `data/normalized/`
+### 3. Normalize
+Splits the cleaned data into relational entities, generates UUIDs, and creates mock data (users, chapters, lessons).
+
+a. **Categories**: Extracts unique categories.
+   *   **Script:** `scripts/normalize/normalize_categories.py`
+   *   **Output:** `data/normalized/categories.csv` & updates `courses.csv`
+
+b. **Users (Instructors)**: Extracts instructors and generates user profiles (email, password, etc.).
+   *   **Script:** `scripts/normalize/normalize_users.py`
+   *   **Output:** `data/normalized/users.csv` & updates `courses.csv`
+
+c. **Tags, Outcomes, Chapters & Lessons**: Extracts tags and generates related content (outcomes, requirements, chapters, lessons) based on those tags.
+   *   **Script:** `scripts/normalize/normalize_tags.py`
+   *   **Outputs:** 
+       *   `data/normalized/tags.csv`
+       *   `data/normalized/course_tag.csv`
+       *   `data/normalized/course_outcomes.csv`
+       *   `data/normalized/course_requirements.csv`
+       *   `data/normalized/chapters.csv`
+       *   `data/normalized/lessons.csv`
+       *   Updates `courses.csv` (removes tags column, adds final IDs)
+
+### 4. Import to Database
+Imports the normalized CSV files into the MySQL databases (`user_service` and `course_service`).
+*   **Script:** `scripts/import-data/import_to_mysql.py`
+*   **Requirements:** MySQL running on localhost:3306 (or configured via `.env`).
 
 ## Usage
 
-To run the cleaning process:
-
-1.  Ensure you have the necessary dependencies installed (e.g., pandas is NOT currently required as the script uses standard `csv` library, but check `requirements.txt` for other tools).
-2.  Run the cleaning script from the `data` directory:
-
+### 1. Setup Environment
 ```bash
-python3 scripts/clean/clean_online_courses.py
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-This will read the raw CSV and generate the cleaned version in the `data/cleaned/` directory.
+### 2. Configure Database
+Create a `.env` file in the `data/` directory:
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_PORT=3306
+```
+
+### 3. Run Full Pipeline
+Run the scripts in the following order to clean, normalize, and import data:
+
+```bash
+# 1. Clean Data
+python scripts/clean/clean_online_courses.py
+
+# 2. Normalize Data (Order matters!)
+python scripts/normalize/normalize_categories.py
+python scripts/normalize/normalize_users.py
+python scripts/normalize/normalize_tags.py
+
+# 3. Import to MySQL
+python scripts/import-data/import_to_mysql.py
+```
+
+### One-Liner Command
+```bash
+python scripts/clean/clean_online_courses.py && \
+python scripts/normalize/normalize_categories.py && \
+python scripts/normalize/normalize_users.py && \
+python scripts/normalize/normalize_tags.py && \
+python scripts/import-data/import_to_mysql.py
+```

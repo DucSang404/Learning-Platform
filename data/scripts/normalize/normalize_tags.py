@@ -113,15 +113,15 @@ def normalize_tags_and_add_ids(input_courses_file, output_courses_file, output_t
                             'deleted': 0,
                             'updated_at': timestamp,
                             'content': f"Nội dung bài học ôn tập về {tag_name}",
-                            'duration': 900, # 15 minutes
-                            'is_public': 1,
+                            'duration': 0,
+                            'is_public': 0,
                             'position': 2,
                             'title': f"Ôn tập về {tag_name}",
-                            'type': 'video', 
-                            'url': "https://core-learnova.t9tieanh.io.vn/api/v1/learning/storage/1769169557863-git1.mp4",
+                            'type': 'article', 
+                            'url': "https://core-learnova.t9tieanh.io.vn/api/v1/learning/storage/1769678749054-git-cheat-sheet-education.pdf",
                             'chapter_id': chapter_id
                         })
-                
+
                 # Prepare updated course row
                 new_row = {
                     'id': course_id,

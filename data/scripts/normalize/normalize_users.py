@@ -55,7 +55,7 @@ def normalize_users(input_courses_file, output_courses_file, output_users_file):
                         username = f"{safe_name}_{ts_str}"
                         
                         email = f"{username}@example.com"
-                        password = f"pass_{str(uuid.uuid4())[:8]}" # Random password
+                        password = "$2a$10$K0xpqJczfZaDhN.eh9ZyQuMkyUZkWzj2qzi8nd0AQyeyNAkGnHYES"
                         phone = f"09{random.randint(10000000, 99999999)}"
                         position = random.choice(positions)
                         status = "ACTIVE"
@@ -64,7 +64,7 @@ def normalize_users(input_courses_file, output_courses_file, output_users_file):
                             'id': user_id,
                             'description': f"Instructor for courses. Experienced {position}.",
                             'email': email,
-                            'image': f"https://api.dicebear.com/7.x/avataaars/svg?seed={username}", # Random avatar
+                            'image': f"https://i.pravatar.cc/300?u={username}", # Random avatar
                             'name': instructor_name,
                             'password': password,
                             'phone': phone,
