@@ -32,4 +32,6 @@ export const env = {
   ASSEMBLYAI_API_KEY: process.env.ASSEMBLYAI_API_KEY || '',
   WEBHOOK_URL: process.env.WEBHOOK_URL || '',
   ASSEMBLYAI_WEBHOOK_SECRET: process.env.ASSEMBLYAI_WEBHOOK_SECRET || 'default_webhook_secret',
+  TEST_API_USERNAME: process.env.TEST_API_USERNAME || 'admin',
+  TEST_API_PASSWORD: process.env.TEST_API_PASSWORD || 'password',
 }

@@ -20,6 +20,7 @@ class AssemblyAIService {
 
         const params = {
             audio: videoUrl,
+            language_detection: true,
             webhook_url: webhookUrl,
             webhook_auth_header_name: 'x-assemblyai-webhook-secret',
             webhook_auth_header_value: env.ASSEMBLYAI_WEBHOOK_SECRET
