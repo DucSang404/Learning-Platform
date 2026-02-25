@@ -109,6 +109,14 @@ class LessonAnalysisService {
         });
 
         Logger.info(`Lesson ${event.lessonId} updated with content.`);
+
+        // 3. Emit TRANSCRIPT_SAVED → reuses the same chunking → summarization pipeline
+        //    as the video flow. processRawText() handles plain text as well as SRT.
+        this.emitter.emit(LessonEvent.TRANSCRIPT_SAVED, {
+            lessonId: event.lessonId,
+            subtitles: content,
+            isSrt: false,
+        } satisfies TranscriptSavedPayload);
     }
 
     private async createOrUpdateLessonFromTranscript(

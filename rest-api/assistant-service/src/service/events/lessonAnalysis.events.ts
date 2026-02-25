@@ -122,16 +122,17 @@ export class LessonAnalysisEvents {
      * Runs as async fire-and-forget so it never blocks the HTTP response path.
      */
     private async onTranscriptSaved(payload: TranscriptSavedPayload): Promise<void> {
-        const { lessonId, subtitles } = payload;
+        const { lessonId, subtitles, isSrt = true } = payload;
 
         Logger.info(
             `[${LessonEvent.TRANSCRIPT_SAVED}] Starting chunking pipeline for lessonId=${lessonId}`
         );
 
-        // 1. Run semantic chunking directly on the SRT string (no tmp file)
+        // 1. Run semantic chunking on the text
         const chunks = await this.chunkingService.processRawText(subtitles, {
             bufferSize: 3,
             percentileThreshold: 90,
+            isSrt,
         });
         Logger.info(
             `Chunking produced ${chunks.length} chunk(s) for lessonId=${lessonId}`

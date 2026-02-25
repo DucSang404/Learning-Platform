@@ -13,6 +13,12 @@ export interface SemanticChunkingConfig {
     percentileThreshold?: number;
     chunkSize?: number;
     chunkOverlap?: number;
+    /**
+     * Whether the input is in SRT subtitle format.
+     * - `true`  (default) → uses `structureSubtitles()` which preserves timestamp metadata.
+     * - `false`           → uses NLP sentence tokenizer + `structureSentences()` for plain text.
+     */
+    isSrt?: boolean;
 }
 
 /**
@@ -64,13 +70,18 @@ export class SemanticChunkingService {
         const {
             bufferSize = 3,
             percentileThreshold = 90,
+            isSrt = true,
         } = config;
 
-        // Step 1: Structure subtitles / sentences from raw text
-        const structuredSentences = this.sentenceProcessor.structureSubtitles(
-            rawText,
-            bufferSize
-        );
+        // Step 1: Structure sentences from raw text.
+        //   - SRT path:       structureSubtitles()   → preserves timestamp / subtitle metadata
+        //   - Plain text path: NLP tokenize → structureSentences() → no extra metadata
+        const structuredSentences = isSrt
+            ? this.sentenceProcessor.structureSubtitles(rawText, bufferSize)
+            : this.sentenceProcessor.structureSentences(
+                this.sentenceProcessor.splitToSentencesUsingNLP(rawText),
+                bufferSize
+            );
 
         // Step 2: Generate embeddings for combined sentences
         const sentencesWithEmbeddings =

@@ -6,6 +6,9 @@
 export interface TranscriptSavedPayload {
     lessonId: string;
     subtitles: string;
+    /** Whether the content is SRT subtitle format. Default: true.
+     *  Set to false for plain-text article content. */
+    isSrt?: boolean;
 }
 
 export interface ChunkingCompletedPayload {
