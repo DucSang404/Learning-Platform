@@ -24,7 +24,8 @@ model Lesson {
   transcriptId String? @unique
   transcript   String? @db.Text
   subtitles    String? @db.Text
-  summary      String? @db.Text
+  summary        String? @db.Text
+  suggestedTitle  String?
 
   chunks    LessonChunk[]
 

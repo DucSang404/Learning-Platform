@@ -19,15 +19,24 @@ export const SummaryPrompts = {
         content,
 
     /**
-     * REDUCE step – synthesise N chunk summaries into one lesson summary.
+     * REDUCE step – synthesise N chunk summaries into one lesson summary + suggested title.
+     * Returns a JSON object: { summary: string; suggestedTitle: string }
      */
     lessonSystem: () =>
         'You are an expert educational content summarizer. ' +
-        'Synthesize section summaries into a single, coherent lesson overview.',
+        'Respond ONLY with a valid JSON object — no markdown, no code fences, no extra text.',
 
     lessonHuman: (combinedSummaries: string) =>
-        'Below are summaries of individual sections of an educational video lesson. ' +
-        'Synthesize these into a single comprehensive lesson summary in 4-5 sentences. ' +
-        'Highlight the main topics covered and key learning outcomes:\n\n' +
+        'Below are summaries of individual sections of an educational lesson.\n' +
+        'Based on these, return a JSON object with exactly two fields:\n' +
+        '  - "summary": a comprehensive lesson summary in 4-5 sentences covering the main topics and key learning outcomes.\n' +
+        '  - "suggestedTitle": a short, engaging lesson title (max 10 words) that captures the core topic.\n\n' +
+        'Section summaries:\n' +
         combinedSummaries,
 } as const;
+
+/** Shape returned by the Reduce LLM call. */
+export interface LessonReduceResult {
+    summary: string;
+    suggestedTitle: string;
+}

@@ -4,14 +4,14 @@ import Logger from '~/utils/logger';
 import { env } from '~/config/env';
 import prismaService from '~/service/utils/prisma.service';
 import { LessonChunk } from '@prisma/client';
-import { SummaryPrompts } from '~/prompts/summary.prompt';
+import { LessonReduceResult, SummaryPrompts } from '~/prompts/summary.prompt';
 
 /**
  * SummaryService implements Map–Reduce Summarization for lesson content.
  *
  * Flow:
- *   1. MAP   – Summarize each LessonChunk individually → save to LessonChunk.summary
- *   2. REDUCE – Combine N chunk summaries → generate final lesson summary → save to Lesson.summary
+ *   1. MAP    – Summarize each LessonChunk individually → save to LessonChunk.summary
+ *   2. REDUCE – Combine N chunk summaries → generate lesson summary + suggestedTitle → save to Lesson
  */
 export class SummaryService {
     private llm: ChatOpenAI;
@@ -35,9 +35,8 @@ export class SummaryService {
      * Runs the full Map–Reduce summarization pipeline for a lesson.
      *
      * @param lessonId - The lesson whose chunks should be summarised.
-     * @returns The final lesson-level summary string.
      */
-    public async summarizeLesson(lessonId: string): Promise<string> {
+    public async summarizeLesson(lessonId: string): Promise<void> {
         Logger.info(`[SummaryService] Starting Map-Reduce for lessonId=${lessonId}`);
 
         // Fetch all chunks for this lesson ordered by position
@@ -48,7 +47,7 @@ export class SummaryService {
 
         if (chunks.length === 0) {
             Logger.warn(`[SummaryService] No chunks found for lessonId=${lessonId}, skipping.`);
-            return '';
+            return;
         }
 
         Logger.info(`[SummaryService] MAP step – summarising ${chunks.length} chunk(s)`);
@@ -58,18 +57,18 @@ export class SummaryService {
 
         Logger.info(`[SummaryService] REDUCE step – synthesising ${chunkSummaries.length} summaries`);
 
-        // Step 2 – REDUCE: combine chunk summaries into one lesson summary
-        const lessonSummary = await this.reduceToLessonSummary(chunkSummaries);
+        // Step 2 – REDUCE: combine chunk summaries → lesson summary + suggestedTitle
+        const { summary, suggestedTitle } = await this.reduceToLessonSummary(chunkSummaries);
 
-        // Persist the final summary onto the Lesson record
+        // Persist both fields onto the Lesson record in a single DB call
         await prismaService.lesson.update({
             where: { id: lessonId },
-            data: { summary: lessonSummary },
+            data: { summary, suggestedTitle },
         });
 
-        Logger.info(`[SummaryService] Lesson summary saved for lessonId=${lessonId}`);
-
-        return lessonSummary;
+        Logger.info(
+            `[SummaryService] Saved summary + suggestedTitle="${suggestedTitle}" for lessonId=${lessonId}`
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -123,9 +122,14 @@ export class SummaryService {
     }
 
     /**
-     * REDUCE step – takes all chunk summaries and produces one coherent lesson summary.
+     * REDUCE step – takes all chunk summaries and produces:
+     *   - `summary`        : comprehensive lesson overview (4-5 sentences)
+     *   - `suggestedTitle` : short, engaging lesson title (max 10 words)
+     *
+     * The LLM is prompted to return a JSON object so both values
+     * are obtained in a single API call.
      */
-    private async reduceToLessonSummary(chunkSummaries: string[]): Promise<string> {
+    private async reduceToLessonSummary(chunkSummaries: string[]): Promise<LessonReduceResult> {
         const combinedSummaries = chunkSummaries
             .map((s, i) => `Section ${i + 1}: ${s}`)
             .join('\n\n');
@@ -136,6 +140,18 @@ export class SummaryService {
         ];
 
         const response = await this.llm.invoke(messages);
-        return (response.content as string).trim();
+        const raw = (response.content as string).trim();
+
+        try {
+            const parsed: LessonReduceResult = JSON.parse(raw);
+            return {
+                summary: parsed.summary?.trim() ?? '',
+                suggestedTitle: parsed.suggestedTitle?.trim() ?? '',
+            };
+        } catch {
+            // Graceful fallback: treat the entire response as the summary
+            Logger.warn('[SummaryService] REDUCE – failed to parse JSON response, using raw text as summary');
+            return { summary: raw, suggestedTitle: '' };
+        }
     }
 }
