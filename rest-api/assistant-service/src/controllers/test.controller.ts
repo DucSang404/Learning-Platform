@@ -1,6 +1,6 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { SemanticChunkingService } from '~/service/chunking/SemanticChunkingService';
+import { SemanticChunkingService } from '~/service/chunking/semanticChunking.service';
 import sendResponse from '~/dto/response/send-response';
 import { StatusCodes } from 'http-status-codes';
 

@@ -26,9 +26,41 @@ model Lesson {
   subtitles    String? @db.Text
   summary      String? @db.Text
 
+  chunks    LessonChunk[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deleted   Boolean  @default(false)
 
   @@map("lessons")
+}
+
+model LessonChunk {
+  id       String @id @default(uuid())
+  lessonId String
+
+  // Text content of the chunk
+  content  String @db.Text
+
+  // AI-generated summary for this chunk (Map step of Map-Reduce summarization)
+  summary  String? @db.Text
+
+  // Position of the chunk within the lesson (0-based)
+  chunkIndex Int
+
+  // Metadata derived from SemanticChunk (subtitle & sentence boundaries)
+  subtitleIndex      Int?    // Index of the first subtitle in this chunk
+  startTime          String? // Start timestamp of the first subtitle
+  endTime            String? // End timestamp of the last subtitle
+  timestamp          String? // Full timestamp range (startTime → endTime)
+  sentenceCount      Int?    // Number of sentences in this chunk
+  startSentenceIndex Int?    // Index of the first sentence in this chunk
+  endSentenceIndex   Int?    // Index of the last sentence in this chunk
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_chunks")
 }

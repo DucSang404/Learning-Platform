@@ -1,8 +1,8 @@
 
-import { DocumentLoader } from "~/service/chunking/DocumentLoader";
-import { SentenceProcessor } from "~/service/chunking/SentenceProcessor";
-import { EmbeddingService } from "~/service/chunking/EmbeddingService";
-import { SemanticAnalyzer } from "~/service/chunking/SemanticAnalyzer";
+import { DocumentLoader } from "~/service/chunking/documentLoader.service";
+import { SentenceProcessor } from "~/service/chunking/sentenceProcessor.service";
+import { EmbeddingService } from "~/service/chunking/embeddingService.service";
+import { SemanticAnalyzer } from "~/service/chunking/semanticAnalyzer.service";
 import { SemanticChunk } from "~/service/chunking/types";
 
 /**
@@ -44,38 +44,54 @@ export class SemanticChunkingService {
         filePath: string,
         config: SemanticChunkingConfig = {}
     ): Promise<SemanticChunk[]> {
+        const textCorpus = await this.documentLoader.loadTextFile(filePath);
+        return this.processRawText(textCorpus, config);
+    }
+
+    /**
+     * Processes a raw text / SRT string and returns semantic chunks with metadata.
+     * Use this when the content is already in memory (e.g. fetched from AssemblyAI)
+     * so there is no need to write a temporary file first.
+     *
+     * @param {string} rawText - Raw SRT or plain-text content to chunk.
+     * @param {SemanticChunkingConfig} config - Configuration options for chunking.
+     * @returns {Promise<SemanticChunk[]>} Array of semantic chunks with content and metadata.
+     */
+    async processRawText(
+        rawText: string,
+        config: SemanticChunkingConfig = {}
+    ): Promise<SemanticChunk[]> {
         const {
-            bufferSize = 1,
-            percentileThreshold = 80,
+            bufferSize = 3,
+            percentileThreshold = 90,
         } = config;
 
-        // Step 1: Load the text file
-        const textCorpus = await this.documentLoader.loadTextFile(filePath);
-
-        // Step 2: Check if subtitle format and structure accordingly
+        // Step 1: Structure subtitles / sentences from raw text
         const structuredSentences = this.sentenceProcessor.structureSubtitles(
-            textCorpus,
+            rawText,
             bufferSize
         );
 
-        // Step 3: Generate embeddings for these combined sentences
+        // Step 2: Generate embeddings for combined sentences
         const sentencesWithEmbeddings =
             await this.embeddingService.generateAndAttachEmbeddings(
                 structuredSentences
             );
 
-        // Step 5: Calculate cosine distances and significant shifts to identify semantic chunks
+        // Step 3: Calculate cosine distances and detect significant semantic shifts
         const { updatedArray, significantShiftIndices } =
             this.semanticAnalyzer.calculateCosineDistancesAndSignificantShifts(
                 sentencesWithEmbeddings,
                 percentileThreshold
             );
 
-        // Step 6: Group sentences into semantic chunks based on the significant shifts identified
+        // Step 4: Group sentences into semantic chunks based on the detected shifts
         const semanticChunks = this.semanticAnalyzer.groupSentencesIntoChunks(
             updatedArray,
             significantShiftIndices
         );
+
+        this.logSemanticChunks(semanticChunks);
 
         return semanticChunks;
     }

@@ -1,7 +1,8 @@
 import amqp, { Channel } from 'amqplib'
 import { QueueNameEnum } from '../../enums/emailType.enum'
 import Logger from '~/utils/logger'
-import LessonAnalysisService, { LessonAnalysisEvent } from '../models/lessonAnalysis.service'
+import LessonAnalysisService from '../analysis/lessonAnalysis.service'
+import { LessonAnalysisEvent } from '~/dto/request/lesson-analysis.dto'
 import { env } from '~/config/env'
 
 const RabbitMQConf = {
