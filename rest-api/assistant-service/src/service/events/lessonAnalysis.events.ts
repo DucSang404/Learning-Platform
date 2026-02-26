@@ -13,6 +13,7 @@ import {
     SummarizationFailedPayload,
     SummarizationStartedPayload,
 } from '~/dto/event/lesson-analysis-events.dto';
+import { AnalysisOutcome } from '~/enums/analysisOutcome.enum';
 
 /**
  * Registers all lesson-related event listeners on the provided EventEmitter.
@@ -191,7 +192,7 @@ export class LessonAnalysisEvents {
         // Notify long-polling HTTP subscribers via Redis pub/sub
         await redisService.publish(`analysis:${lessonId}`, {
             lessonId,
-            status: 'completed',
+            status: AnalysisOutcome.COMPLETED,
         });
     }
 }

@@ -11,11 +11,12 @@ export const SummaryPrompts = {
      */
     chunkSystem: () =>
         'You are an expert at summarizing educational video transcripts. ' +
-        'Your summaries are clear, concise, and capture the key learning points.',
+        'Your summaries are clear, concise, and capture the key learning points. ' +
+        'Always respond in Vietnamese.',
 
     chunkHuman: (content: string) =>
-        'Summarize the following transcript excerpt from an educational lesson in 2-3 concise sentences. ' +
-        'Focus on the main concepts taught:\n\n' +
+        'Tóm tắt đoạn transcript sau từ một bài học giáo dục trong 2-3 câu ngắn gọn bằng tiếng Việt. ' +
+        'Tập trung vào các khái niệm chính được trình bày:\n\n' +
         content,
 
     /**
@@ -24,14 +25,15 @@ export const SummaryPrompts = {
      */
     lessonSystem: () =>
         'You are an expert educational content summarizer. ' +
+        'Always respond in Vietnamese. ' +
         'Respond ONLY with a valid JSON object — no markdown, no code fences, no extra text.',
 
     lessonHuman: (combinedSummaries: string) =>
-        'Below are summaries of individual sections of an educational lesson.\n' +
-        'Based on these, return a JSON object with exactly two fields:\n' +
-        '  - "summary": a comprehensive lesson summary in 4-5 sentences covering the main topics and key learning outcomes.\n' +
-        '  - "suggestedTitle": a short, engaging lesson title (max 10 words) that captures the core topic.\n\n' +
-        'Section summaries:\n' +
+        'Dưới đây là tóm tắt của từng phần trong một bài học giáo dục.\n' +
+        'Dựa trên các phần này, hãy trả về một JSON object với đúng hai trường:\n' +
+        '  - "summary": tóm tắt toàn diện bài học trong 4-5 câu tiếng Việt, bao gồm các chủ đề chính và kết quả học tập quan trọng.\n' +
+        '  - "suggestedTitle": tiêu đề ngắn gọn, hấp dẫn bằng tiếng Việt (tối đa 10 từ) phản ánh chủ đề cốt lõi.\n\n' +
+        'Tóm tắt từng phần:\n' +
         combinedSummaries,
 } as const;
 

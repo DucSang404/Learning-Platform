@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors, UseFormHandleSubmit } from 'react-hook-form'
 import { CreationLessonFormValues } from '@/utils/create-course/curriculum'
 import useLoading from '@/hooks/useLoading.hook'
+import { useAnalysis } from '@/hooks/useAnalysis.hook'
 
 interface Step2DetailsFormProps {
     videoSrc: string | null
@@ -57,9 +58,16 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
     // TODO: replace with real auth check when VIP feature is ready
     const isVip = true
 
-    /** Parse "MM:SS" or "HH:MM:SS" string into seconds */
+    // Real analysis data from backend (long-poll)
+    const { state: analysisState } = useAnalysis(lessonId, isVip)
+    const analysisData = analysisState.status === 'completed' ? analysisState.data : null
+    const isAnalysisLoading = analysisState.status === 'loading' || analysisState.status === 'processing'
+
+    /** Parse "MM:SS", "HH:MM:SS" or SRT format "HH:MM:SS,mmm" into seconds */
     const parseTimeToSeconds = (t: string): number => {
-        const parts = t.split(':').map(Number)
+        // SRT: "00:00:18,831" → strip milliseconds first
+        const clean = t.split(',')[0].trim()
+        const parts = clean.split(':').map(Number)
         if (parts.length === 2) return parts[0] * 60 + parts[1]
         if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
         return 0
@@ -198,9 +206,9 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                         {/* AI Suggestion for Title – VIP only */}
                         {isVip ? (
                             <AiSuggestion
-                                isLoading={isLoadingSuggestions}
-                                suggestion={suggestions?.title}
-                                onApply={() => setValue('title', suggestions?.title || '')}
+                                isLoading={isAnalysisLoading}
+                                suggestion={analysisData?.suggestedTitle ?? undefined}
+                                onApply={() => setValue('title', analysisData?.suggestedTitle || '')}
                                 type="title"
                             />
                         ) : (
@@ -230,9 +238,9 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                         {/* AI Suggestion for Content – VIP only */}
                         {isVip ? (
                             <AiSuggestion
-                                isLoading={isLoadingSuggestions}
-                                suggestion={suggestions?.content}
-                                onApply={() => setValue('content', suggestions?.content || '')}
+                                isLoading={isAnalysisLoading}
+                                suggestion={analysisData?.summary ?? undefined}
+                                onApply={() => setValue('content', analysisData?.summary || '')}
                                 type="content"
                             />
                         ) : (
@@ -265,6 +273,7 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                 {/* LearnovaAI Analysis Section */}
                 <LearnovaAISection
                     isVip={isVip}
+                    lessonId={lessonId}
                     onSeek={contentType === 'video' ? handleSeek : undefined}
                 />
 

@@ -23,8 +23,8 @@ class AnalysisController {
             switch (result.outcome) {
                 case AnalysisOutcome.NOT_FOUND:
                     sendResponse(res, {
-                        code: StatusCodes.NOT_FOUND,
-                        message: `Lesson ${lessonId} not found in assistant service`,
+                        code: StatusCodes.OK,
+                        message: `Bài học chưa được xử lý trong hệ thống`,
                         result: null,
                     })
                     break
@@ -32,7 +32,7 @@ class AnalysisController {
                 case AnalysisOutcome.COMPLETED:
                     sendResponse(res, {
                         code: StatusCodes.OK,
-                        message: 'Analysis complete',
+                        message: 'Phân tích nội dung hoàn tất',
                         result: result.data,
                     })
                     break
@@ -40,13 +40,13 @@ class AnalysisController {
                 case AnalysisOutcome.PROCESSING:
                     sendResponse(res, {
                         code: StatusCodes.ACCEPTED,
-                        message: 'Analysis still processing, please retry',
+                        message: 'Nội dung đang được phân tích, vui lòng thử lại sau',
                         result: result.data,
                     })
                     break
 
                 case AnalysisOutcome.ABORTED:
-                    // Client disconnected — do nothing, connection is already closed
+                    // Client ngắt kết nối — không cần gửi response
                     break
             }
         } catch (error) {

@@ -1,0 +1,87 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import analysisService, { AnalysisResult } from '@/services/assistant/analysis.service'
+
+export type AnalysisState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'completed'; data: AnalysisResult }
+    | { status: 'processing'; message: string }
+    | { status: 'not_found'; message: string }
+    | { status: 'error'; message: string }
+
+const RETRY_DELAY_MS = 3_000        // wait 3s before retrying on 202
+const MAX_RETRIES = 10              // give up after 10 retries (~5 min with 25s long-poll each)
+
+/**
+ * Polls the long-polling analysis endpoint until:
+ *   status 200 (completed) → resolves
+ *   status 202 (processing) → auto-retries after RETRY_DELAY_MS
+ *   status 404 → not_found
+ *   network error → error state
+ *
+ * Only fetches when lessonId is provided and isVip is true.
+ */
+export function useAnalysis(lessonId: string | undefined, isVip: boolean) {
+    const [state, setState] = useState<AnalysisState>({ status: 'idle' })
+    const abortRef = useRef<AbortController | null>(null)
+    const retryCount = useRef(0)
+    const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const fetchAnalysis = useCallback(async () => {
+        if (!lessonId || !isVip) return
+
+        setState({ status: 'loading' })
+        retryCount.current = 0
+
+        const poll = async () => {
+            if (retryCount.current >= MAX_RETRIES) {
+                setState({ status: 'error', message: 'Phân tích mất quá nhiều thời gian, vui lòng thử lại sau.' })
+                return
+            }
+
+            try {
+                const res = await analysisService.getAnalysis(lessonId)
+
+                // 404 — lesson not yet in assistant-service
+                if (res.code === 200 && res.result === null) {
+                    setState({ status: 'not_found', message: res.message ?? 'Bài học chưa được xử lý trong hệ thống' })
+                    return
+                }
+
+                // 200 — completed
+                if (res.code === 200 && res.result?.status === 'completed') {
+                    setState({ status: 'completed', data: res.result })
+                    return
+                }
+
+                // 202 — still processing, retry after delay
+                if (res.code === 202 || res.result?.status === 'processing') {
+                    setState({ status: 'processing', message: res.message ?? 'Nội dung đang được phân tích, vui lòng chờ…' })
+                    retryCount.current += 1
+                    retryTimer.current = setTimeout(poll, RETRY_DELAY_MS)
+                    return
+                }
+
+                // Fallback
+                setState({ status: 'error', message: 'Phản hồi không hợp lệ từ server.' })
+            } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : 'Lỗi không xác định'
+                setState({ status: 'error', message: msg })
+            }
+        }
+
+        await poll()
+    }, [lessonId, isVip])
+
+    useEffect(() => {
+        fetchAnalysis()
+
+        return () => {
+            // Cleanup: cancel in-flight retry timer on unmount / lessonId change
+            if (retryTimer.current) clearTimeout(retryTimer.current)
+            abortRef.current?.abort()
+        }
+    }, [fetchAnalysis])
+
+    return { state, refetch: fetchAnalysis }
+}

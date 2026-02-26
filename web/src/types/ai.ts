@@ -15,12 +15,12 @@ export interface ConversationLoadResponse {
 
 
 export interface LessonChunk {
-    id: string
-    chunkIndex: number
-    summary: string | null
-    timestamp: string | null
-    startTime: string | null
-    endTime: string | null
-    sentenceCount: number | null
-    content: string
+  id: string
+  chunkIndex: number
+  summary: string | null
+  timestamp: string | null
+  startTime: string | null
+  endTime: string | null
+  sentenceCount: number | null
+  content?: string 
 }

@@ -88,7 +88,7 @@ export class AnalysisService {
                     try {
                         const fresh = await this.getLessonAnalysis(lessonId)
                         settle(
-                            fresh?.status === 'completed'
+                            fresh?.status === AnalysisOutcome.COMPLETED
                                 ? { outcome: AnalysisOutcome.COMPLETED, data: fresh }
                                 : { outcome: AnalysisOutcome.PROCESSING, data: fresh ?? existing }
                         )
