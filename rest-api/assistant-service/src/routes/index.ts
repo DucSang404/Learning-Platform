@@ -4,8 +4,8 @@ import { StatusCodes } from 'http-status-codes'
 import chatbotRouter from '~/routes/chatbot.route'
 import webhookRouter from '~/routes/webhook.route'
 import testRouter from '~/routes/test.route'
-
 import transcriptionRouter from '~/routes/transcription.route'
+import analysisRouter from '~/routes/analysis.route'
 
 const IndexRouter: Router = express.Router()
 
@@ -13,6 +13,7 @@ IndexRouter.use('/', chatbotRouter)
 IndexRouter.use('/transcription', transcriptionRouter)
 IndexRouter.use('/webhook', webhookRouter)
 IndexRouter.use('/test', testRouter)
+IndexRouter.use('/analysis', analysisRouter)
 
 IndexRouter.route('/status').get(async (req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({

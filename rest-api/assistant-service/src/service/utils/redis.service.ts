@@ -174,6 +174,36 @@ class RedisService {
     const stringValue = typeof value === 'string' ? value : JSON.stringify(value)
     return await this.redis.rpush(key, stringValue)
   }
+
+  // ---------------------------------------------------------------------------
+  // Pub / Sub
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Publish a message to a Redis channel.
+   * Returns the number of subscribers that received the message.
+   */
+  async publish(channel: string, data: unknown): Promise<number> {
+    const payload = typeof data === 'string' ? data : JSON.stringify(data)
+    return await this.redis.publish(channel, payload)
+  }
+
+  /**
+   * Create a *dedicated* Redis connection for subscribing.
+   * ioredis (and Redis itself) requires a separate connection for pub/sub —
+   * once a connection enters subscriber mode it can only issue subscribe/unsubscribe/psubscribe.
+   *
+   * Callers are responsible for calling .disconnect() when done.
+   */
+  createSubscriber(): Redis {
+    return new Redis({
+      host: env.REDIS_DB_HOST,
+      port: env.REDIS_DB_PORT,
+      password: env.REDIS_DB_PASSWORD,
+      username: env.REDIS_DB_USER,
+      db: env.REDIS_DB_NAME,
+    })
+  }
 }
 
 export default new RedisService()

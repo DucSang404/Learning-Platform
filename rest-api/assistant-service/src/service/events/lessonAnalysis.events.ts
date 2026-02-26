@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import Logger from '~/utils/logger';
 import prismaService from '~/service/utils/prisma.service';
+import redisService from '~/service/utils/redis.service';
 import { LessonEvent } from '~/enums/lessonEvents.enum';
 import { SemanticChunkingService } from '~/service/chunking/semanticChunking.service';
 import { SummaryService } from '~/service/analysis/summary.service';
@@ -186,5 +187,11 @@ export class LessonAnalysisEvents {
             lessonId,
             chunkCount,
         } satisfies SummarizationCompletedPayload);
+
+        // Notify long-polling HTTP subscribers via Redis pub/sub
+        await redisService.publish(`analysis:${lessonId}`, {
+            lessonId,
+            status: 'completed',
+        });
     }
 }
