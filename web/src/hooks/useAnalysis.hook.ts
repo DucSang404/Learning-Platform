@@ -9,8 +9,8 @@ export type AnalysisState =
     | { status: 'not_found'; message: string }
     | { status: 'error'; message: string }
 
-const RETRY_DELAY_MS = 3_000        // wait 3s before retrying on 202
-const MAX_RETRIES = 10              // give up after 10 retries (~5 min with 25s long-poll each)
+const RETRY_DELAY_MS = 5_000        // wait 5s before retrying on 202
+const MAX_RETRIES = 15              // give up after 15 retries (~5 min with 5s long-poll each)
 
 /**
  * Polls the long-polling analysis endpoint until:
@@ -42,8 +42,17 @@ export function useAnalysis(lessonId: string | undefined, isVip: boolean) {
             try {
                 const res = await analysisService.getAnalysis(lessonId)
 
-                // 404 — lesson not yet in assistant-service
+                // 200 result=null — lesson not yet synced to assistant-service
+                // This happens because the MQ message hasn't been consumed yet right
+                // after upload. Treat it the same as 202 and keep retrying.
                 if (res.code === 200 && res.result === null) {
+                    if (retryCount.current < MAX_RETRIES) {
+                        setState({ status: 'processing', message: 'Đang chờ hệ thống xử lý bài học…' })
+                        retryCount.current += 1
+                        retryTimer.current = setTimeout(poll, RETRY_DELAY_MS)
+                        return
+                    }
+                    // Gave up after MAX_RETRIES — lesson truly not found
                     setState({ status: 'not_found', message: res.message ?? 'Bài học chưa được xử lý trong hệ thống' })
                     return
                 }

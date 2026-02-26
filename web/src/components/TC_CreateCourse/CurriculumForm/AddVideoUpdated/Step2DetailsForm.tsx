@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Upload, ScanEye, Eye, Video, FileText, AlignLeft, ExternalLink, Trash2, Crown, Lock } from 'lucide-react'
-import { fetchMockAiSuggestions } from './mock/aiSuggestions'
 import AiSuggestion from './AiSuggestion'
 import LearnovaAISection from './LearnovaAISection'
 import learnovaLogo from '@/assets/images/logo1.png'
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors, UseFormHandleSubmit } from 'react-hook-form'
 import { CreationLessonFormValues } from '@/utils/create-course/curriculum'
 import useLoading from '@/hooks/useLoading.hook'
-import { useAnalysis } from '@/hooks/useAnalysis.hook'
+import { AnalysisState } from '@/hooks/useAnalysis.hook'
 
 interface Step2DetailsFormProps {
     videoSrc: string | null
@@ -31,6 +30,9 @@ interface Step2DetailsFormProps {
     handleUpdateLesson: (data: CreationLessonFormValues, startLoading?: () => void, stopLoading?: () => void) => void
     contentType: 'video' | 'document'
     handleDelLesson?: (lessonId: string) => Promise<void>
+    /** Lifted from parent so analysis persists between steps */
+    analysisState: AnalysisState
+    refetchAnalysis: () => void
 }
 
 const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
@@ -48,18 +50,19 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
     handleClose,
     handleUpdateLesson,
     contentType,
-    handleDelLesson
+    handleDelLesson,
+    analysisState,
+    refetchAnalysis,
 }) => {
     const duration = watch('duration')
     const isPublic = watch('isPublic')
     const { loading, startLoading, stopLoading } = useLoading()
     const videoRef = useRef<HTMLVideoElement>(null)
 
-    // TODO: replace with real auth check when VIP feature is ready
+    // VIP flag (TODO: real auth)
     const isVip = true
 
-    // Real analysis data from backend (long-poll)
-    const { state: analysisState } = useAnalysis(lessonId, isVip)
+    // Derived from injected analysis state
     const analysisData = analysisState.status === 'completed' ? analysisState.data : null
     const isAnalysisLoading = analysisState.status === 'loading' || analysisState.status === 'processing'
 
@@ -79,15 +82,6 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
         videoRef.current.play()
     }
 
-    const formatDuration = (seconds: number) => {
-        if (!seconds || seconds <= 0) return '0:00'
-        const hrs = Math.floor(seconds / 3600)
-        const mins = Math.floor((seconds % 3600) / 60)
-        const secs = seconds % 60
-        if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-        return `${mins}:${String(secs).padStart(2, '0')}`
-    }
-
     const [suggestions, setSuggestions] = useState<{ title: string; content: string } | null>(null)
     const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
     const [isVideoLoading, setIsVideoLoading] = useState(true)
@@ -100,20 +94,20 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
         setIsVideoLoading(false)
     }
 
-    useEffect(() => {
-        const loadSuggestions = async () => {
-            setIsLoadingSuggestions(true)
-            try {
-                const data = await fetchMockAiSuggestions()
-                setSuggestions(data)
-            } catch (error) {
-                console.error("Failed to load AI suggestions", error)
-            } finally {
-                setIsLoadingSuggestions(false)
-            }
-        }
-        loadSuggestions()
-    }, [])
+    // useEffect(() => {
+    //     const loadSuggestions = async () => {
+    //         setIsLoadingSuggestions(true)
+    //         try {
+    //             const data = await fetchMockAiSuggestions()
+    //             setSuggestions(data)
+    //         } catch (error) {
+    //             console.error("Failed to load AI suggestions", error)
+    //         } finally {
+    //             setIsLoadingSuggestions(false)
+    //         }
+    //     }
+    //     loadSuggestions()
+    // }, [])
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -273,7 +267,8 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                 {/* LearnovaAI Analysis Section */}
                 <LearnovaAISection
                     isVip={isVip}
-                    lessonId={lessonId}
+                    analysisState={analysisState}
+                    refetchAnalysis={refetchAnalysis}
                     onSeek={contentType === 'video' ? handleSeek : undefined}
                 />
 

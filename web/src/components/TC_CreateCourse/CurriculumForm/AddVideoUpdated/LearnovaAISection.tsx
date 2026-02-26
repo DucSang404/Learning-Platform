@@ -14,30 +14,33 @@ import CustomButton from '@/components/common/Button'
 import ChunkCard from './ChunkCard'
 import { LessonChunk } from '@/types/ai'
 import { MOCK_CHUNKS } from './mock/aiSuggestions'
-import { useAnalysis } from '@/hooks/useAnalysis.hook'
+import { AnalysisState } from '@/hooks/useAnalysis.hook'
 import { LoadingDots } from '@/components/common/Loading/LoadingDots'
 
 interface LearnovaAISectionProps {
     isVip?: boolean
-    /** Real lessonId — when provided, fetches from API; omit to show mock data */
-    lessonId?: string
+    /** Analysis state lifted from parent (AddVideoForm) */
+    analysisState: AnalysisState
+    refetchAnalysis?: () => void
     onSeek?: (startTime: string | null) => void
 }
 
 const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
     isVip = true,
-    lessonId,
+    analysisState,
+    refetchAnalysis,
     onSeek,
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [localChunks, setLocalChunks] = useState<LessonChunk[] | null>(null)
 
-    // Real API — only runs when lessonId is set and user is VIP
-    const { state, refetch } = useAnalysis(lessonId, isVip)
+    // Use the injected state (no internal hook call)
+    const state = analysisState
+    const refetch = refetchAnalysis ?? (() => { })
 
     // Decide which chunks to display: local edits > API data > mock
     const apiChunks = state.status === 'completed' ? state.data.chunks : null
-    const chunks: LessonChunk[] = localChunks ?? apiChunks ?? (lessonId ? [] : MOCK_CHUNKS)
+    const chunks: LessonChunk[] = localChunks ?? apiChunks ?? (state.status === 'idle' ? MOCK_CHUNKS : [])
 
     const summary = state.status === 'completed' ? state.data.summary : null
     const suggestedTitle = state.status === 'completed' ? state.data.suggestedTitle : null
@@ -169,7 +172,7 @@ const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
                                 ? `${chunkCount} phân đoạn đã được phân tích`
                                 : state.status === 'loading' || state.status === 'processing'
                                     ? <LoadingDots text="Đang xử lý" className="text-blue-100 text-xs" />
-                                    : !lessonId
+                                    : state.status === 'idle'
                                         ? `${chunkCount} phân đoạn (dữ liệu mẫu)`
                                         : '—'}
                         </p>
