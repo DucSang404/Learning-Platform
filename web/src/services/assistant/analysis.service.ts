@@ -31,7 +31,7 @@ class AssistantAnalysisService {
     async getAnalysis(lessonId: string): Promise<ApiResponse<AnalysisResult | null>> {
         const res = await axiosClient.axiosInstance.get(
             `assistant/analysis/lessons/${lessonId}`,
-            { timeout: 30_000 } // > 25s server timeout
+            { timeout: 60_000 } // > 25s server timeout
         )
         return res.data as ApiResponse<AnalysisResult | null>
     }

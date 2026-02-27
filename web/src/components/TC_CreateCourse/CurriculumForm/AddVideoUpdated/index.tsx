@@ -220,7 +220,7 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
         try {
             startLoading && startLoading()
             const result = await lessonService.updateMetaLesson({
-                id: lessonId as string,
+                id: effectiveLessonId as string || initialData?.id as string,
                 title: data.title,
                 content: data.content,
                 isPublic: data.isPublic
