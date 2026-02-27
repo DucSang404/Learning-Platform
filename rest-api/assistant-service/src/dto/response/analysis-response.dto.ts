@@ -6,6 +6,7 @@ import { Lesson, LessonChunk } from '@prisma/client'
 export interface ChunkDto {
     id: string
     chunkIndex: number
+    title: string | null
     summary: string | null
     timestamp: string | null
     startTime: string | null
@@ -38,6 +39,7 @@ export function toChunkDto(chunk: LessonChunk): ChunkDto {
     return {
         id: chunk.id,
         chunkIndex: chunk.chunkIndex,
+        title: chunk.title,
         summary: chunk.summary,
         timestamp: chunk.timestamp,
         startTime: chunk.startTime,

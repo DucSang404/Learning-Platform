@@ -43,7 +43,8 @@ model LessonChunk {
   // Text content of the chunk
   content  String @db.Text
 
-  // AI-generated summary for this chunk (Map step of Map-Reduce summarization)
+  // AI-generated title and summary for this chunk (Map step of Map-Reduce summarization)
+  title    String? @db.Text
   summary  String? @db.Text
 
   // Position of the chunk within the lesson (0-based)

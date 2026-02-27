@@ -133,7 +133,7 @@ export class LessonAnalysisEvents {
         // 1. Run semantic chunking on the text
         const chunks = await this.chunkingService.processRawText(subtitles, {
             bufferSize: 3,
-            percentileThreshold: 90,
+            percentileThreshold: 95,
             isSrt,
         });
         Logger.info(

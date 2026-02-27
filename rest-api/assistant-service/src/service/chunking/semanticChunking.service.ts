@@ -69,7 +69,7 @@ export class SemanticChunkingService {
     ): Promise<SemanticChunk[]> {
         const {
             bufferSize = 3,
-            percentileThreshold = 90,
+            percentileThreshold = 95,
             isSrt = true,
         } = config;
 

@@ -41,39 +41,48 @@ const ChunkCard: React.FC<ChunkCardProps> = ({ chunk, onSaveSummary, onSeek }) =
                 className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 cursor-pointer select-none"
                 onClick={() => { if (!isEditing) setIsExpanded((v) => !v) }}
             >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
                     {/* Index badge */}
-                    <div className="flex items-center gap-1 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    <div className="flex-shrink-0 flex items-center gap-1 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                         <Hash className="w-3 h-3" />
                         {chunk.chunkIndex + 1}
                     </div>
 
-                    {/* Timestamp + Seek button */}
-                    {chunk.timestamp && (
-                        <div className="flex items-center gap-1">
-                            <div className="flex items-center gap-1 text-xs text-indigo-600 font-medium">
-                                <Clock className="w-3 h-3" />
-                                {chunk.timestamp}
+                    <div className="flex flex-col flex-1 min-w-0 pr-4">
+                        {/* Chunk Title (Truncated if too long) */}
+                        {chunk.title && (
+                            <div className="text-[15px] font-semibold text-gray-800 truncate mb-0.5" title={chunk.title}>
+                                {chunk.title}
                             </div>
-                            {onSeek && (
-                                <CustomButton
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onSeek(chunk.startTime)
-                                    }}
-                                    className="p-0.5 h-5 w-5 rounded bg-indigo-100 hover:bg-indigo-200 border-0 text-indigo-600 transition-colors shadow-none ml-0.5"
-                                    title="Tua video tới phân đoạn này"
-                                >
-                                    <PlayCircle className="w-3.5 h-3.5" />
-                                </CustomButton>
-                            )}
-                        </div>
-                    )}
+                        )}
 
-                    {/* Sentence count badge */}
+                        {/* Timestamp + Seek button */}
+                        {chunk.timestamp && (
+                            <div className="flex-shrink-0 flex items-center gap-1">
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                                    <Clock className="w-3 h-3" />
+                                    {chunk.timestamp}
+                                </div>
+                                {onSeek && (
+                                    <CustomButton
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onSeek(chunk.startTime)
+                                        }}
+                                        className="p-0.5 h-4 w-4 rounded bg-indigo-100 hover:bg-indigo-200 border-0 text-indigo-600 transition-colors shadow-none ml-0.5"
+                                        title="Tua video tới phân đoạn này"
+                                    >
+                                        <PlayCircle className="w-3 h-3" />
+                                    </CustomButton>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Sentence count badge (hidden on very small screens) */}
                     {chunk.sentenceCount && (
-                        <span className="text-xs text-gray-400 hidden sm:inline">
+                        <span className="flex-shrink-0 text-xs text-gray-400 hidden sm:inline">
                             {chunk.sentenceCount} câu
                         </span>
                     )}

@@ -4,7 +4,7 @@ import Logger from '~/utils/logger';
 import { env } from '~/config/env';
 import prismaService from '~/service/utils/prisma.service';
 import { LessonChunk } from '@prisma/client';
-import { LessonReduceResult, SummaryPrompts } from '~/prompts/summary.prompt';
+import { LessonReduceResult, ChunkReduceResult, SummaryPrompts } from '~/prompts/summary.prompt';
 
 /**
  * SummaryService implements Map–Reduce Summarization for lesson content.
@@ -24,6 +24,7 @@ export class SummaryService {
             model: 'gpt-4o-mini',
             temperature: 0.3,
             apiKey: env.OPENAI_API_KEY,
+            maxTokens: 500,
         });
     }
 
@@ -97,7 +98,8 @@ export class SummaryService {
     }
 
     /**
-     * Summarises a single chunk and persists the result to `LessonChunk.summary`.
+     * Summarises a single chunk and persists the result to `LessonChunk.title` and `LessonChunk.summary`.
+     * Returns a combined string for the REDUCE step: "Title: [title]\nSummary: [summary]"
      */
     private async summarizeChunk(chunk: LessonChunk): Promise<string> {
         const messages = [
@@ -106,19 +108,31 @@ export class SummaryService {
         ];
 
         const response = await this.llm.invoke(messages);
-        const summary = (response.content as string).trim();
+        const raw = (response.content as string).trim();
 
-        // Persist chunk-level summary (Map step result)
+        let title = '';
+        let summary = raw; // Default fallback to raw text
+
+        try {
+            const parsed: ChunkReduceResult = JSON.parse(raw);
+            title = parsed.title?.trim() ?? '';
+            summary = parsed.summary?.trim() ?? summary;
+        } catch {
+            Logger.warn(`[SummaryService] MAP – failed to parse JSON for chunkId=${chunk.id}, using raw text`);
+        }
+
+        // Persist chunk-level title and summary (Map step result)
         await prismaService.lessonChunk.update({
             where: { id: chunk.id },
-            data: { summary },
+            data: { title, summary },
         });
 
         Logger.info(
             `[SummaryService] MAP – chunk ${chunk.chunkIndex} summarised (chunkId=${chunk.id})`
         );
 
-        return summary;
+        // Return a combined string so the REDUCE step has context of both the title and the summary of the chunk
+        return `Title: ${title}\nSummary: ${summary}`;
     }
 
     /**

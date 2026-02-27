@@ -18,10 +18,15 @@ export const SummaryPrompts = {
         'Summaries must be concise, factually accurate, and based ONLY on the provided text. ' +
         'Do NOT add external knowledge, assumptions, examples, or interpretations. ' +
         'Avoid repetition. ' +
-        'Always respond in Vietnamese.',
+        'Always respond in Vietnamese. ' +
+        'You MUST respond with a strictly valid JSON object only. ' +
+        'Do NOT include markdown, code fences, comments, explanations, or extra text. ' +
+        'The response must be directly parseable JSON.',
 
     chunkHuman: (content: string) =>
-        'Tóm tắt đoạn transcript sau trong đúng 2-3 câu ngắn gọn (không quá 80 từ). ' +
+        'Dựa HOÀN TOÀN vào đoạn transcript dưới đây, hãy trả về một JSON object với đúng hai trường:\n\n' +
+        '1. "title": Tiêu đề ngắn gọn (5-7 từ) phản ánh ý chính của đoạn này.\n' +
+        '2. "summary": Tóm tắt nội dung đoạn transcript trong đúng 2-3 câu ngắn gọn (không quá 80 từ).\n\n' +
         'Chỉ bao gồm các khái niệm hoặc ý chính được đề cập trực tiếp trong nội dung. ' +
         'Không suy diễn hoặc thêm thông tin ngoài văn bản.\n\n' +
         '--- BEGIN TRANSCRIPT ---\n' +
@@ -59,8 +64,14 @@ export const SummaryPrompts = {
         '\n--- END PARTIAL SUMMARIES ---',
 } as const;
 
-/** Shape returned by the Reduce LLM call. */
+/** Shape returned by the Reduce LLM call (Lesson synthesis). */
 export interface LessonReduceResult {
     summary: string;
     suggestedTitle: string;
+}
+
+/** Shape returned by the Map LLM call (Chunk synthesis). */
+export interface ChunkReduceResult {
+    title: string;
+    summary: string;
 }
