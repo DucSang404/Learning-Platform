@@ -36,7 +36,7 @@ WORKDIR /app
 COPY assistant-service/package*.json ./
 
 # Install only production dependencies (no dev dependencies)
-RUN npm install --omit=dev && \
+RUN npm ci --omit=dev --legacy-peer-deps && \
     npm cache clean --force && \
     rm -rf /tmp/* /var/tmp/*
 

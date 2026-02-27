@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import Logger from '~/utils/logger';
 
-import LessonAnalysisService from '~/service/models/lessonAnalysis.service';
+import LessonAnalysisService from '~/service/analysis/lessonAnalysis.service';
 import sendResponse from '~/dto/response/send-response';
 import { StatusCodes } from 'http-status-codes';
 

@@ -212,7 +212,8 @@ const ChapterForm = ({
       <CustomDialog
         open={open}
         setOpen={setOpen}
-        size='full'
+        className="!max-w-[95vw] md:!max-w-5xl h-[90vh] overflow-hidden flex flex-col"
+        contentClassName="flex-1 min-h-0"
         title={
           <>
             <BookOpen className='h-4 w-4 mr-2' />

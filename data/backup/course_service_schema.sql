@@ -102,13 +102,13 @@ DROP TABLE IF EXISTS `course_outcomes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `course_outcomes` (
+  `id` varchar(255) NOT NULL PRIMARY KEY,
   `course_id` varchar(255) NOT NULL,
   `outcome` varchar(255) DEFAULT NULL,
   KEY `FKq8u25isnaaswsfiv0yt8sl6p4` (`course_id`),
   CONSTRAINT `FKq8u25isnaaswsfiv0yt8sl6p4` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
 --
 -- Table structure for table `course_requirements`
 --
@@ -117,6 +117,7 @@ DROP TABLE IF EXISTS `course_requirements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `course_requirements` (
+  `id` varchar(255) NOT NULL PRIMARY KEY,
   `course_id` varchar(255) NOT NULL,
   `requirement` varchar(255) DEFAULT NULL,
   KEY `FKbh8ta744mcx845fv5oa5dtyyi` (`course_id`),
@@ -132,6 +133,7 @@ DROP TABLE IF EXISTS `course_tag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `course_tag` (
+  `id` varchar(255) NOT NULL PRIMARY KEY,
   `course_id` varchar(255) NOT NULL,
   `tag_id` varchar(255) NOT NULL,
   KEY `FK4xljwd6thh893y5t81btpen5q` (`tag_id`),
@@ -140,7 +142,6 @@ CREATE TABLE `course_tag` (
   CONSTRAINT `FK7om0f3y4q6v90v5mv8femot2g` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
 --
 -- Table structure for table `courses`
 --

@@ -67,11 +67,13 @@ def normalize_tags_and_add_ids(input_courses_file, output_courses_file, output_t
                         # Outcome: "You will allow to skill [Tag]"
                         # Requirement: "Have basic knowledge about [Tag]"
                         course_outcomes.append({
+                            'id': str(uuid.uuid4()),
                             'course_id': course_id,
                             'outcome': f"Nắm vững kiến thức và kỹ năng về {tag_name}"
                         })
 
                         course_requirements.append({
+                            'id': str(uuid.uuid4()),
                             'course_id': course_id,
                             'requirement': f"Có tìm hiểu cơ bản về {tag_name}"
                         })
@@ -160,7 +162,7 @@ def normalize_tags_and_add_ids(input_courses_file, output_courses_file, output_t
         print(f"Created {len(course_tags_relations)} course-tag relations to: {output_course_tags_file}")
         
         # Write Course Outcomes CSV
-        outcomes_header = ['course_id', 'outcome']
+        outcomes_header = ['id', 'course_id', 'outcome']
         with open(output_outcomes_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.DictWriter(outfile, fieldnames=outcomes_header)
             writer.writeheader()
@@ -168,7 +170,7 @@ def normalize_tags_and_add_ids(input_courses_file, output_courses_file, output_t
         print(f"Created {len(course_outcomes)} course outcomes to: {output_outcomes_file}")
 
         # Write Course Requirements CSV
-        requirements_header = ['course_id', 'requirement']
+        requirements_header = ['id', 'course_id', 'requirement']
         with open(output_requirements_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.DictWriter(outfile, fieldnames=requirements_header)
             writer.writeheader()
