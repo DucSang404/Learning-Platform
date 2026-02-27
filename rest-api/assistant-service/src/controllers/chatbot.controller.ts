@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import chatbotService from '~/service/models/chatbot.service';
+import chatbotService from '~/service/analysis/chatbot.service';
 import sendResponse from '~/dto/response/send-response';
 
 class ChatbotController {
