@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import Step1MediaUpload from './Step1MediaUpload'
 import Step2DetailsForm from './Step2DetailsForm'
 import Step0TypeSelection from './Step0TypeSelection'
+import { useAnalysis } from '@/hooks/useAnalysis.hook'
 
 import { MultiUploadItem } from '@/hooks/useMultiUpload'
 import { Lesson } from '@/utils/create-course/curriculum'
@@ -74,6 +75,27 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
     const currentUpload = uploads.find(u => u.id === currentUploadId)
     const isUploading = currentUpload?.status === 'uploading'
     const uploadProgress = currentUpload?.progress || 0
+
+    // Derived: lessonId returned by backend SSE 'completed' event { lessonId: '...' }
+    // Reading directly from currentUpload.data (reactive via uploads prop) to avoid
+    // useState/useEffect batching timing issues.
+    const createdLessonId: string | undefined = currentUpload?.data?.lessonId
+    // Effective lessonId: edit mode uses prop, create mode uses SSE response
+    const effectiveLessonId = lessonId ?? createdLessonId
+
+    // TODO: replace with real auth check
+    const isVip = true
+
+    // Analysis hook lives here so it persists across step transitions
+    const { state: analysisState, refetch: refetchAnalysis } = useAnalysis(effectiveLessonId, isVip)
+
+    // Trigger long-polling the moment step 3 (details) becomes visible
+    useEffect(() => {
+        if (step === 2 && effectiveLessonId) {
+            refetchAnalysis()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, effectiveLessonId])
 
     const handleSelectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
@@ -198,7 +220,7 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
         try {
             startLoading && startLoading()
             const result = await lessonService.updateMetaLesson({
-                id: lessonId as string,
+                id: effectiveLessonId as string || initialData?.id as string,
                 title: data.title,
                 content: data.content,
                 isPublic: data.isPublic
@@ -348,7 +370,7 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
 
                         {step === 2 && (
                             <Step2DetailsForm
-                                lessonId={lessonId}
+                                lessonId={effectiveLessonId}
                                 videoSrc={videoSrc}
                                 selectedFile={selectedFile}
                                 setStep={setStep}
@@ -362,6 +384,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                                 handleUpdateLesson={handleUpdateLesson}
                                 contentType={contentType}
                                 handleDelLesson={handleDelLesson}
+                                analysisState={analysisState}
+                                refetchAnalysis={refetchAnalysis}
                             />
                         )}
                     </form>

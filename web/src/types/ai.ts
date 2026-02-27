@@ -12,3 +12,16 @@ export interface ConversationLoadResponse {
   message: string
   result: ConversationMessage[]
 }
+
+
+export interface LessonChunk {
+  id: string
+  chunkIndex: number
+  title: string | null
+  summary: string | null
+  timestamp: string | null
+  startTime: string | null
+  endTime: string | null
+  sentenceCount: number | null
+  content?: string
+}
