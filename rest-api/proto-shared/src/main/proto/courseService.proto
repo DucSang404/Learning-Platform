@@ -18,4 +18,5 @@ service CourseService {
   rpc checkHasPurchased(HasPurchasedCourseRequest) returns (HasPurchasedCourseResponse);
   rpc updateCourseRating(UpdateCourseRatingRequest) returns (UpdateCourseRatingResponse);
   rpc isInstructor(IsInstructorRequest) returns (IsInstructorResponse);
+  rpc canEditLesson(CanEditLessonRequest) returns (CanEditLessonResponse);
 }
