@@ -13,9 +13,10 @@ import learnovaLogo from '@/assets/images/logo1.png'
 import CustomButton from '@/components/common/Button'
 import ChunkCard from './ChunkCard'
 import { LessonChunk } from '@/types/ai'
-import { MOCK_CHUNKS } from './mock/aiSuggestions'
 import { AnalysisState } from '@/hooks/useAnalysis.hook'
 import { LoadingDots } from '@/components/common/Loading/LoadingDots'
+import AssistantAnalysisService from '@/services/assistant/analysis.service'
+import { toast } from 'sonner'
 
 interface LearnovaAISectionProps {
     isVip?: boolean
@@ -38,17 +39,34 @@ const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
     const state = analysisState
     const refetch = refetchAnalysis ?? (() => { })
 
-    // Decide which chunks to display: local edits > API data > mock
+    // Decide which chunks to display: local edits > API data
     const apiChunks = state.status === 'completed' ? state.data.chunks : null
-    const chunks: LessonChunk[] = localChunks ?? apiChunks ?? (state.status === 'idle' ? MOCK_CHUNKS : [])
+    const chunks: LessonChunk[] = localChunks ?? apiChunks ?? []
 
     const summary = state.status === 'completed' ? state.data.summary : null
     const suggestedTitle = state.status === 'completed' ? state.data.suggestedTitle : null
 
-    const handleSaveSummary = (id: string, newSummary: string) => {
-        const base = localChunks ?? apiChunks ?? []
-        setLocalChunks(base.map((c) => (c.id === id ? { ...c, summary: newSummary } : c)))
-        // TODO: call API to persist chunk summary
+    const handleSaveSummary = async (id: string, newSummary: string) => {
+        try {
+            // Note: API is only called if we have a real lessonId from the state
+            if (state.status === 'completed' && state.data) {
+                const data = await AssistantAnalysisService.updateChunkSummary(state.data.lessonId, id, newSummary)
+
+                if (data.code !== 200) {
+                    throw new Error(data?.message || 'Không thể cập nhật tóm tắt')
+                }
+
+                toast.success(data.message || 'Đã cập nhật tóm tắt')
+
+                // Update local state ONLY on success 
+                const base = localChunks ?? apiChunks ?? []
+                setLocalChunks(base.map((c) => (c.id === id ? { ...c, summary: newSummary } : c)))
+            }
+        } catch (error: any) {
+            const msg = error?.response?.data?.message || error?.message || 'Cập nhật thất bại, vui lòng thử lại sau'
+            toast.error(msg)
+            throw error // rethrow to stop ChunkCard loading spinner
+        }
     }
 
     // ── Loading / Error states ─────────────────────────────────────────────
@@ -173,7 +191,7 @@ const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
                                 : state.status === 'loading' || state.status === 'processing'
                                     ? <LoadingDots text="Đang xử lý" className="text-blue-100 text-xs" />
                                     : state.status === 'idle'
-                                        ? `${chunkCount} phân đoạn (dữ liệu mẫu)`
+                                        ? `Chưa có dữ liệu`
                                         : '—'}
                         </p>
                     </div>
