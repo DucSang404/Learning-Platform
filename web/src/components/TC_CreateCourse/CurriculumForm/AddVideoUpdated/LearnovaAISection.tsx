@@ -24,6 +24,7 @@ interface LearnovaAISectionProps {
     analysisState: AnalysisState
     refetchAnalysis?: () => void
     onSeek?: (startTime: string | null) => void
+    onUpgradeClick?: () => void
 }
 
 const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
@@ -31,6 +32,7 @@ const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
     analysisState,
     refetchAnalysis,
     onSeek,
+    onUpgradeClick,
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [localChunks, setLocalChunks] = useState<LessonChunk[] | null>(null)
@@ -87,6 +89,7 @@ const LearnovaAISection: React.FC<LearnovaAISectionProps> = ({
                         label="Nâng cấp VIP"
                         icon={<Sparkles className="w-4 h-4 mr-2" />}
                         className="mt-4 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-xl px-5"
+                        onClick={onUpgradeClick}
                     />
                 </div>
             )

@@ -12,6 +12,7 @@ type authState = {
     avatarUrl?: string
     conversationId?: string
     role?: string
+    isVip?: boolean
   } | null
 }
 
@@ -24,8 +25,8 @@ type authActions = {
 export const useAuthStore = create(
   persist<authState & authActions>(
     (set) => ({
-      data: null,
-      setData: (data) => set(() => ({ data })),
+      data: { isVip: true } as any, // Mock value
+      setData: (data) => set(() => ({ data: { ...data, isVip: true } as any })),
       setConversationId: (conversationId) => set((s) => ({ data: s.data ? { ...s.data, conversationId } : s.data })),
       logout: () => set(() => ({ data: null }))
     }),
