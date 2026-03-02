@@ -17,6 +17,7 @@ const App: FC = () => {
           position='top-center'
           richColors
           expand={true}
+          style={{ zIndex: 99999 }}
           toastOptions={{
             style: {
               background: 'white',

@@ -57,6 +57,24 @@ class OrderController {
         }
     }
 
+    async processVipPayment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = req.user?.sub;
+            const paymentMethod = req.params.method;
+            const ipAddress = req.ip;
+            const { email } = req.data;
+
+            const paymentResult = await orderService.processVipPayment(userId as string, email, paymentMethod, ipAddress);
+            sendResposne(res, {
+                code: 200,
+                message: 'Khởi tạo thanh toán VIP thành công !',
+                result: paymentResult
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async applyDiscount(req: Request, res: Response, next: NextFunction) {
         try {
             const userId = req.user?.sub;

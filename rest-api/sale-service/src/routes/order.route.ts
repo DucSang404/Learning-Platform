@@ -12,7 +12,8 @@ orderRouter.use(Authentication());
 orderRouter.post('/', validateDto(CreateOrderDto), orderController.createOrder);
 orderRouter.get('/', orderController.getOrder);
 orderRouter.get('/:orderId/info', orderController.getOrderInfo);
-orderRouter.post('/payment/:method',  validateDto(CreatePaymentUrlDto), orderController.processPayment);
+orderRouter.post('/payment/:method', validateDto(CreatePaymentUrlDto), orderController.processPayment);
+orderRouter.post('/vip-payment/:method', validateDto(CreatePaymentUrlDto), orderController.processVipPayment);
 orderRouter.post('/apply-discount', validateDto(ApplyDiscountDto), orderController.applyDiscount);
 orderRouter.get('/history', orderController.getOrderHistory);
 

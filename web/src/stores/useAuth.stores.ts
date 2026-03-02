@@ -25,8 +25,8 @@ type authActions = {
 export const useAuthStore = create(
   persist<authState & authActions>(
     (set) => ({
-      data: { isVip: true } as any, // Mock value
-      setData: (data) => set(() => ({ data: { ...data, isVip: true } as any })),
+      data: null,
+      setData: (data) => set(() => ({ data })),
       setConversationId: (conversationId) => set((s) => ({ data: s.data ? { ...s.data, conversationId } : s.data })),
       logout: () => set(() => ({ data: null }))
     }),

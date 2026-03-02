@@ -30,6 +30,7 @@ model Order {
   id          String        @id @default(cuid())
   user_id     String
   status      OrderStatus   @default(Pending)
+  type        OrderType     @default(COURSE)
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
   customer_name String
@@ -87,3 +88,19 @@ enum OrderStatus {
   Pending
   Completed
 }
+
+enum OrderType {
+  COURSE
+  VIP_SUBSCRIPTION
+}
+
+model VipPackage {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  price           Float
+  duration_months Int      @default(1)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+}
+

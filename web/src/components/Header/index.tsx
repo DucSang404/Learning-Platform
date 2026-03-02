@@ -9,9 +9,10 @@ import { useAuthStore } from '@/stores/useAuth.stores'
 import { useCartStore } from '@/stores/useCart.stores'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { LogIn, UserPlus, House, BookOpen, Building2, StickyNote, ShoppingCart, Menu as MenuIcon } from 'lucide-react'
+import { LogIn, UserPlus, House, BookOpen, Building2, StickyNote, ShoppingCart, Menu as MenuIcon, Crown } from 'lucide-react'
 import Menu from './menu'
 import logo from '@/assets/images/logo1.png'
+import { useVipUpgrade } from '@/contexts/VipUpgradeContext'
 
 const Header: FC = () => {
   const navigate = useNavigate()
@@ -21,10 +22,11 @@ const Header: FC = () => {
   const refresh = useCartStore((s) => s.refresh)
   const [isOpen, setIsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const { openVipDialog } = useVipUpgrade()
 
   useEffect(() => {
     // refresh cart count on header mount
-    refresh().catch(() => {})
+    refresh().catch(() => { })
   }, [refresh])
 
   // publish header height as a CSS variable so pages can position elements under it
@@ -100,26 +102,46 @@ const Header: FC = () => {
 
             {/* User Menu / Auth Buttons */}
             {data ? (
-              <div className='profile flex gap-2 text-sm font-bold items-center'>
-                <Popover open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                  <PopoverTrigger className='flex gap-2 items-center'>
-                    <p className='hidden md:block'>
-                      <span className='text-red-500 italic font-base'>Xin chào</span> {data.name}
-                    </p>
-                    <Avatar className='rounded-3xl w-8 h-8 md:w-10 md:h-10'>
-                      <AvatarImage src={data.avatarUrl} alt='avatar' />
-                      <AvatarFallback>{data.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  </PopoverTrigger>
-                  <PopoverContent className='w-80'>
-                    <Menu
-                      username={data.username as string}
-                      name={data.name as string}
-                      avatarUrl={data.avatarUrl as string}
-                      closeMenu={() => setIsProfileOpen(false)}
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className='flex items-center gap-3 md:gap-5'>
+                {/* Explore VIP Button for non-VIP users */}
+                {!data.isVip && (
+                  <button
+                    onClick={openVipDialog}
+                    className='hidden md:flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-semibold text-yellow-700 bg-gradient-to-r from-yellow-100 to-amber-100 hover:from-yellow-200 hover:to-amber-200 border border-yellow-200 rounded-full transition-all hover:scale-105 shadow-sm'
+                  >
+                    <Crown className='w-4 h-4' />
+                    <span>Khám phá VIP</span>
+                  </button>
+                )}
+
+                <div className='profile flex gap-2 text-sm font-bold items-center'>
+                  <Popover open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+                    <PopoverTrigger className='flex gap-2 items-center outline-none'>
+                      <p className='hidden md:block mt-0.5'>
+                        <span className='text-red-500 italic font-base'>Xin chào</span> {data.name}
+                      </p>
+                      <div className='relative'>
+                        <Avatar className={`rounded-3xl w-8 h-8 md:w-10 md:h-10 transition-transform hover:scale-105 ${data.isVip ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}>
+                          <AvatarImage src={data.avatarUrl} alt='avatar' />
+                          <AvatarFallback>{data.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        {data.isVip && (
+                          <div className='absolute -bottom-1 -right-1 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full p-0.5 shadow-sm border-2 border-white z-10'>
+                            <Crown className='w-3 h-3 text-white' strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-80'>
+                      <Menu
+                        username={data.username as string}
+                        name={data.name as string}
+                        avatarUrl={data.avatarUrl as string}
+                        closeMenu={() => setIsProfileOpen(false)}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             ) : (
               <div className='flex items-center gap-2'>
