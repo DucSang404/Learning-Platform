@@ -7,8 +7,10 @@ import VnPayLogo from '@/assets/images/Icon-VNPAY-QR.webp'
 import momoLogo from '@/assets/images/momo-logo.webp'
 import { toast } from 'sonner'
 import orderService from '@/services/sale/order.service'
+import vipPackageService from '@/services/sale/vip-package.service'
 import { showConfirmToast } from '@/components/common/ShowConfirmToast'
 import { useAuthStore } from '@/stores/useAuth.stores'
+import { VipPackage } from '@/types/vip-package.type'
 
 interface VipUpgradeDialogProps {
     open: boolean
@@ -42,6 +44,27 @@ const VipUpgradeDialog: React.FC<VipUpgradeDialogProps> = ({
 }) => {
     const { data } = useAuthStore()
     const userEmail = data?.email || ''
+    const [vipPkg, setVipPkg] = React.useState<VipPackage | null>(null)
+    const [isLoadingPackage, setIsLoadingPackage] = React.useState(false)
+
+    React.useEffect(() => {
+        if (open && !vipPkg) {
+            const fetchPackage = async () => {
+                setIsLoadingPackage(true)
+                try {
+                    const res = await vipPackageService.getVipPackageByDuration(1)
+                    if (res && res.result) {
+                        setVipPkg(res.result)
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch VIP package', error)
+                } finally {
+                    setIsLoadingPackage(false)
+                }
+            }
+            fetchPackage()
+        }
+    }, [open, vipPkg])
 
     const handlePayWithVnPay = async () => {
         const confirmed = await showConfirmToast({
@@ -148,9 +171,16 @@ const VipUpgradeDialog: React.FC<VipUpgradeDialogProps> = ({
                             <Crown className="w-8 h-8" />
                         </div>
 
-                        <h3 className="text-xl md:text-2xl font-bold text-gray-900 leading-snug uppercase tracking-wide">
-                            Bắt đầu kiếm thêm<br className="hidden md:block" /> thu nhập ngay!
-                        </h3>
+                        {isLoadingPackage ? (
+                            <div className="space-y-2">
+                                <div className="h-8 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                                <div className="h-6 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                            </div>
+                        ) : (
+                            <h3 className="text-xl md:text-2xl font-bold text-gray-900 leading-snug uppercase tracking-wide">
+                                Chỉ với {vipPkg?.price?.toLocaleString('vi-VN')}₫<br className="hidden md:block" /> cho {vipPkg?.duration_months} tháng
+                            </h3>
+                        )}
 
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-2xl text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
                             {/* Subtle pattern inside the card */}
