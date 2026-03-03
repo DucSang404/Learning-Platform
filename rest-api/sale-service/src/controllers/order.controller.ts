@@ -127,6 +127,42 @@ class OrderController {
         }
     }
 
+    async verifyVipOrderForVnpay(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = req.query;
+            const verificationResult = await orderPaymentService.verifyVipOrderForVnpay(query);
+            if (!verificationResult.isSuccess) {
+                sendResposne(res, {
+                    code: 400,
+                    message: 'Xác thực đơn vip thất bại !',
+                    result: verificationResult
+                });
+                return;
+            }
+            return res.redirect(env.WEB_URL + '?vip_success=true');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async verifyVipOrderForMomo(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = req.query;
+            const verificationResult = await orderPaymentService.verifyVipOrderForMomo(query);
+            if (!verificationResult.isSuccess) {
+                sendResposne(res, {
+                    code: 400,
+                    message: 'Xác thực đơn vip thất bại !',
+                    result: verificationResult
+                });
+                return;
+            }
+            return res.redirect(env.WEB_URL + '?vip_success=true');
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async getOrderInfo(req: Request, res: Response, next: NextFunction) {
         try {
             const { orderId } = req.params;

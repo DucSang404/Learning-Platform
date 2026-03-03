@@ -208,13 +208,15 @@ class OrderService {
             payUri = await vnpayService.createPayment({
                 amount: vipPrice,
                 orderId: createdOrder.id,
-                ipAddr: ipAddress || '127.0.0.1'
+                ipAddr: ipAddress || '127.0.0.1',
+                type: OrderType.VIP_SUBSCRIPTION
             });
         } else if (paymentMethod === 'MOMO') {
             payUri = await momoService.createPayment({
                 amount: vipPrice,
                 orderId: createdOrder.id,
-                ipAddr: ipAddress || '127.0.0.1'
+                ipAddr: ipAddress || '127.0.0.1',
+                type: OrderType.VIP_SUBSCRIPTION
             });
         }
 

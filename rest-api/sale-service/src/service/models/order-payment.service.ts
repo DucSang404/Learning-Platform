@@ -6,7 +6,7 @@ import vnpayService from '~/service/utils/vnpay.service';
 import momoService from '../utils/momo.service';
 import rabbitMQService from '~/service/utils/rabbitmq.service';
 import { createEnvelope } from '~/sagas/events/envelope';
-import { OrderCreatedPayload } from '~/sagas/order/dtos';
+import { OrderCreatedPayload, VipRegisterCreatedPayload } from '~/sagas/order/dtos';
 import { MessageType } from '~/sagas/order/events';
 import Logger from '~/utils/logger';
 
@@ -17,6 +17,14 @@ class OrderPaymentService {
 
     async verifyOrderForVnPay(query: any) {
         return this.handleVerify(query, 'vnpay');
+    }
+
+    async verifyVipOrderForMomo(query: any) {
+        return this.handleVerifyVip(query, 'momo');
+    }
+
+    async verifyVipOrderForVnpay(query: any) {
+        return this.handleVerifyVip(query, 'vnpay');
     }
 
     /** 
@@ -68,6 +76,62 @@ class OrderPaymentService {
             return this.buildResponse(true, orderId, updated, `Thanh toán đơn hàng ${orderId} thành công`, '00');
         } catch (err: any) {
             Logger.error(`Error verifying order (${provider}): ${err}`);
+            if (orderId) await this.markOrderCancel(orderId);
+
+            if (err instanceof ApiError) {
+                const rspCode = err.status === StatusCodes.OK ? '00' : String(err.status);
+                return this.buildResponse(false, orderId, query, err.message, rspCode);
+            }
+
+            return this.buildResponse(false, '', null, 'Lỗi hệ thống', '99');
+        }
+    }
+
+    /** 
+     * Core shared verify flow for VIP subscriptions
+     */
+    private async handleVerifyVip(query: any, provider: 'momo' | 'vnpay') {
+        let orderId = '';
+        try {
+            // Step 1. Validate callback and fetch order
+            const { order, orderId: id, amount } =
+                provider === 'momo'
+                    ? await this.validateMomoCallback(query)
+                    : await this.validateVnpayCallback(query);
+            orderId = id;
+
+            // Step 2. Do NOT mark order as completed yet, wait for user service
+            // Step 3. Publish VIP_REGISTER_CREATED event
+            // Find the VIP package configuration duration (assume 1 from the default config for now, could also fetch it or store it in order metadata)
+            // But since it's a test/prototype, we use 1 month as default duration based on current implementations
+            const durationMonths = 1;
+
+            const payload: VipRegisterCreatedPayload = {
+                orderId: order.id,
+                userId: order.user_id,
+                amount: order.total,
+                durationMonths: durationMonths
+            };
+
+            const envelope = createEnvelope({
+                type: MessageType.VIP_REGISTER_CREATED,
+                payload,
+                correlationId: `viporder-${order.id}`,
+            });
+
+            try {
+                // Publish to app_events exchange with topic MessageType.VIP_REGISTER_CREATED
+                await rabbitMQService.sendMessageTopic(envelope, 'app_events', MessageType.VIP_REGISTER_CREATED, 'topic', true);
+            } catch (err) {
+                Logger.error(`Publish VIP_REGISTER_CREATED failed (${provider}): ${err}`);
+                await this.markOrderCancel(orderId);
+                return this.buildResponse(false, orderId, null, 'Không thể đẩy event cập nhật VIP', '98');
+            }
+
+            // Success verification but order is pending until User Service responds
+            return this.buildResponse(true, orderId, order, `Xác thực đơn hàng VIP ${orderId} thành công. Chờ xử lý...`, '00');
+        } catch (err: any) {
+            Logger.error(`Error verifying VIP order (${provider}): ${err}`);
             if (orderId) await this.markOrderCancel(orderId);
 
             if (err instanceof ApiError) {

@@ -81,12 +81,14 @@ class NodeMailService {
         const orderNotification = notification as {
           email?: string | string[]
           to?: string | string[]
-          payload?: unknown
+          payload?: any
         }
 
-        subject = 'Xác nhận đơn hàng của bạn'
+        const isVipOrder = orderNotification.payload?.orderType === 'VIP'
+
+        subject = isVipOrder ? 'Cảm ơn bạn đã đăng ký VIP!' : 'Xác nhận đơn hàng của bạn'
         to = orderNotification.email || orderNotification.to || []
-        templateName = 'order-confirmation.html'
+        templateName = isVipOrder ? 'vip-confirmation.html' : 'order-confirmation.html'
         templateData = orderNotification.payload || orderNotification
         break
       }
@@ -125,7 +127,6 @@ class NodeMailService {
         }
         break
       }
-      // Thêm các loại khác nếu cần
       default:
         Logger.info(`Chưa thể gửi mail to ${notification.email}: ${notification.type}`)
         return

@@ -2,6 +2,9 @@ export const MessageType = {
   ORDER_CREATED: 'order.created.v1',
   REGISTER_UPDATED: 'register.updated.v1',
   REGISTER_UPDATE_FAILED: 'register.update.failed.v1',
+  VIP_REGISTER_CREATED: 'vip.register.created.v1',
+  VIP_REGISTER_UPDATED: 'vip.register.updated.v1',
+  VIP_REGISTER_FAILED: 'vip.register.failed.v1',
   ORDER_COMPLETED: 'order.completed.v1',
   ORDER_COMPLETION_FAILED: 'order.completion.failed.v1',
   NOTIFICATION_SEND: 'notification.send.v1'

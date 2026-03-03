@@ -1,4 +1,4 @@
-import { RegisterUpdatedPayload } from '../order/dtos';
+import { RegisterUpdatedPayload, VipRegisterUpdatedPayload, VipRegisterFailedPayload } from '../order/dtos';
 import prismaService from '~/service/utils/prisma.service'
 import { OrderStatus } from '@prisma/client';
 import rabbitMQService from '~/service/utils/rabbitmq.service';
@@ -31,7 +31,7 @@ class OrderHandler {
       // Send notification
       await this.sendMessage(
         MessageType.NOTIFICATION_SEND,
-        orderData,
+        { ...orderData, orderType: 'COURSE' },
         `order-${order.id}`
       );
 
@@ -68,6 +68,37 @@ class OrderHandler {
   // Handle when receiving event register.update.failed.v1
   async handleRegisterUpdateFailed(message: RegisterUpdatedPayload) {
     Logger.error(`Register update failed for order: ${message.orderId}`);
+    await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } });
+  }
+
+  // Handle successful VIP registration update
+  async handleVipRegisterUpdated(message: VipRegisterUpdatedPayload) {
+    try {
+      const order = await prismaService.order.findFirst({ where: { id: message.orderId } });
+      if (!order) throw new Error('VIP Order not found');
+
+      // Update status to Completed
+      await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
+
+      const orderData = await orderService.getOrderInfo(order.user_id, message.orderId);
+
+      // Send notification for VIP
+      await this.sendMessage(
+        MessageType.NOTIFICATION_SEND,
+        { ...orderData, orderType: 'VIP' },
+        `viporder-${order.id}`
+      );
+
+      Logger.info(`Successfully completed VIP order: ${message.orderId}`);
+    } catch (error) {
+      Logger.error(`Error completing VIP order: ${error}`);
+      await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } }).catch(() => { });
+    }
+  }
+
+  // Handle failed VIP registration update
+  async handleVipRegisterFailed(message: VipRegisterFailedPayload) {
+    Logger.error(`VIP Register update failed for order ${message.orderId}: ${message.reason || message.status}`);
     await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } });
   }
 }

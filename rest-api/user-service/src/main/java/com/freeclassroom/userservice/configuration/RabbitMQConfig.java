@@ -1,6 +1,7 @@
 package com.freeclassroom.userservice.configuration;
 
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -15,6 +16,7 @@ public class RabbitMQConfig {
     //queue
     public static final String VERIFY_REGISTER_QUEUE = "register-user-queue";
     public static final String FORGOT_PASSWORD_QUEUE = "forgot-password-queue";
+    public static final String VIP_REGISTER_QUEUE = "vippackage.register.service.queue";
 
     //routing key
     public static final String VERIFY_REGISTER_ROUTING_KEY = "user.verify.register";
@@ -49,6 +51,7 @@ public class RabbitMQConfig {
                 .to(userNotificationExchange)
                 .with(FORGOT_PASSWORD_ROUTING_KEY);
     }
+    // --- config rabbit mq ----
 
     @Bean
     public MessageConverter messageConverter() {
@@ -60,5 +63,23 @@ public class RabbitMQConfig {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setMessageConverter(messageConverter);
         return rabbitTemplate;
+    }
+
+    @Bean
+    public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            Jackson2JsonMessageConverter messageConverter) {
+
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
+        factory.setDefaultRequeueRejected(true);
+        return factory;
     }
 }
