@@ -4,6 +4,7 @@ import com.freeclassroom.userservice.dto.request.expertise.AddExpertiseRequest;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.common.CreationResponse;
 import com.freeclassroom.userservice.dto.response.user.MyProfileResponse;
+import com.freeclassroom.userservice.dto.response.user.VipStatusResponse;
 import com.freeclassroom.userservice.service.expertise.IExpertiseService;
 import com.freeclassroom.userservice.service.user.IUserService;
 import lombok.AccessLevel;
@@ -28,6 +29,12 @@ public class SelfController {
         return userService.geyMyProfile(userId);
     }
 
+    @GetMapping("/vip-status")
+    public ApiResponse<VipStatusResponse> getVipStatus() {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.getVipStatus(userId);
+    }
+
     @GetMapping("/instructor")
     public ApiResponse<MyProfileResponse> getInstructorProfile(
             @RequestParam String userId) {
@@ -46,3 +53,4 @@ public class SelfController {
         return expertiseService.addExpertiseForUser(username, expertiseId);
     }
 }
+

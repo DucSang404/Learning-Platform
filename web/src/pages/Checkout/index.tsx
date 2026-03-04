@@ -58,7 +58,7 @@ const CheckoutPage = () => {
   }, [id, navigate])
 
   return (
-    <div className='bg-gray-50'>
+    <div className='bg-white'>
       {order && id && mode === 'view' ? (
         <OrderSuccess order={order} id={id as string} />
       ) : (

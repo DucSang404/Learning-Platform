@@ -13,6 +13,7 @@ export enum OrderStatus {
 }
 
 export interface Order {
+  id: string
   type: 'COURSE' | 'VIP_SUBSCRIPTION'
   items: OrderItem[]
   user_id: string
@@ -21,6 +22,7 @@ export interface Order {
   total: number
   status: OrderStatus
   ttl: number
+  created_at?: string
   discount?: {
     code: string
     type: 'Percent' | 'Amount'

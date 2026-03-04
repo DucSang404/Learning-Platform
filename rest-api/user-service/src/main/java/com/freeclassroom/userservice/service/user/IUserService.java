@@ -8,6 +8,7 @@ import com.freeclassroom.userservice.dto.response.auth.CheckForgotPasswordRespon
 import com.freeclassroom.userservice.dto.response.user.GetUserResponse;
 import com.freeclassroom.userservice.dto.response.user.MyProfileResponse;
 import com.freeclassroom.userservice.dto.response.user.UserResponse;
+import com.freeclassroom.userservice.dto.response.user.VipStatusResponse;
 
 public interface IUserService {
     ApiResponse<UserResponse> registerUser(CreationUserRequest request);
@@ -19,4 +20,5 @@ public interface IUserService {
     ApiResponse<MyProfileResponse> geyMyProfile(String id);
     ApiResponse<GetUserResponse> updateUser(String id, UpdateUserRequest request);
     ApiResponse<DataAdminHome> getAdminData();
+    ApiResponse<VipStatusResponse> getVipStatus(String userId);
 }

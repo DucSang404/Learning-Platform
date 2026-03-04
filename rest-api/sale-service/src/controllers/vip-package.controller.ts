@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import vipPackageService from '~/service/models/vip-package.service';
-import sendResposne from '~/dto/response/send-response';
+import sendResponse from '~/dto/response/send-response';
 import ApiError from '~/middleware/ApiError';
 
 class VipPackageController {
     async getVipPackages(req: Request, res: Response, next: NextFunction) {
         try {
             const packages = await vipPackageService.getVipPackages();
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Lấy danh sách gói VIP thành công !',
                 result: packages
@@ -24,7 +24,7 @@ class VipPackageController {
                 throw new ApiError(400, 'Thời hạn không hợp lệ');
             }
             const vipPackage = await vipPackageService.getVipPackageByDuration(duration);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Lấy thông tin gói VIP thành công !',
                 result: vipPackage

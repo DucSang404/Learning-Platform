@@ -135,7 +135,7 @@ const PersonalInfo = () => {
                         onClick={() => fileInputRef.current?.click()}
                         aria-label='Chọn ảnh đại diện mới'
                       >
-                        <Avatar className={`h-20 md:h-28 w-20 md:w-28 shadow-lg cursor-pointer ${data?.isVip ? 'ring-4 ring-yellow-400 ring-offset-4 ring-offset-[#0C356A]' : ''}`}>
+                        <Avatar className={`h-20 md:h-28 w-20 md:w-28 shadow-lg cursor-pointer ${userInfo?.isVip ? 'ring-4 ring-yellow-400 ring-offset-4 ring-offset-[#0C356A]' : ''}`}>
                           <AvatarImage
                             src={form.imageFile ? URL.createObjectURL(form.imageFile) : userInfo?.image}
                             alt={userInfo?.name}
@@ -148,7 +148,7 @@ const PersonalInfo = () => {
                         <div className='pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100'>
                           <Camera className='w-6 h-6 text-white' />
                         </div>
-                        {data?.isVip && (
+                        {userInfo?.isVip && (
                           <div className='absolute bottom-0 right-0 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full p-1.5 shadow-sm border-2 border-[#0C356A] z-10'>
                             <Crown className='w-4 h-4 md:w-5 md:h-5 text-white' strokeWidth={2.5} />
                           </div>
@@ -165,13 +165,13 @@ const PersonalInfo = () => {
                     </>
                   ) : (
                     <div className='relative'>
-                      <Avatar className={`h-20 md:h-28 w-20 md:w-28 shadow-lg ${data?.isVip ? 'ring-4 ring-yellow-400 ring-offset-4 ring-offset-[#0C356A]' : ''}`}>
+                      <Avatar className={`h-20 md:h-28 w-20 md:w-28 shadow-lg ${userInfo?.isVip ? 'ring-4 ring-yellow-400 ring-offset-4 ring-offset-[#0C356A]' : ''}`}>
                         <AvatarImage src={userInfo?.image} alt={userInfo?.name} className='object-cover' />
                         <AvatarFallback className='text-lg font-semibold bg-primary text-primary-foreground'>
                           <User className='h-6 w-6' />
                         </AvatarFallback>
                       </Avatar>
-                      {data?.isVip && (
+                      {userInfo?.isVip && (
                         <div className='absolute bottom-0 right-0 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full p-1.5 shadow-sm border-2 border-[#0C356A] z-10'>
                           <Crown className='w-4 h-4 md:w-5 md:h-5 text-white' strokeWidth={2.5} />
                         </div>
@@ -182,7 +182,7 @@ const PersonalInfo = () => {
                 <div className='flex-1 min-w-0 flex flex-col justify-center items-center md:items-start'>
                   <h3 className='text-lg md:text-3xl font-bold text-white mb-1 truncate text-center md:text-start flex items-center gap-3 w-full justify-center md:justify-start'>
                     {userInfo?.name}
-                    {data?.isVip && (
+                    {userInfo?.isVip && (
                       <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs md:text-sm uppercase font-bold px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1.5 flex-shrink-0">
                         <Crown className="w-3 h-3 md:w-4 md:h-4" /> VIP
                       </span>
@@ -192,7 +192,7 @@ const PersonalInfo = () => {
                     @{userInfo?.username}
                   </p>
 
-                  {!data?.isVip && (
+                  {!userInfo?.isVip && (
                     <CustomButton
                       label='Tìm hiểu Learnova VIP'
                       icon={<Crown className='w-4 h-4 mr-1.5 text-yellow-600' />}
