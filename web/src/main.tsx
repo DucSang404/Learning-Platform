@@ -40,6 +40,7 @@ import Home2 from './pages/Home2'
 import { SocketProvider } from '@/api/socket/socket.context'
 import DiscountsAdmin from './pages/AD_Discounts'
 import AuthenticationGate from '@/components/auth-gate/AuthenticationGate'
+import VipSuccess from './pages/VipSuccess'
 
 const router = createBrowserRouter([
   {
@@ -62,7 +63,8 @@ const router = createBrowserRouter([
           { path: 'home2', element: <Home2 /> },
           { path: 'about', element: <About /> },
           { path: 'check-out', element: <CheckoutPage /> },
-          { path: 'check-out/:id', element: <CheckoutPage /> }
+          { path: 'check-out/:id', element: <CheckoutPage /> },
+          { path: 'check-out/vip-success/:id', element: <VipSuccess /> }
         ]
       },
       { path: 'auth', element: <AuthLayout /> },

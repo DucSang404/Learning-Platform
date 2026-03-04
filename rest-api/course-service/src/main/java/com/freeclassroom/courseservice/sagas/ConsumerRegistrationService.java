@@ -92,6 +92,7 @@ public class ConsumerRegistrationService {
 
     // send message to sale service to notify fail
     private void sendFailureMessage(MessageDTO<RegisterRequestDto> message) {
+        String orderId = (message.getPayload() != null) ? message.getPayload().getOrderId() : "UNDEFINED_ORDER_ID";
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.SAGA_EXCHANGE,
                 RabbitMQConfig.ORDER_SERVICE_QUEUE_ROUTING_KEY,
@@ -101,7 +102,7 @@ public class ConsumerRegistrationService {
                         .version("1")
                         .source("course-service")
                         .payload(RegisterResponseDto.builder()
-                                .orderId(message.getPayload().getOrderId())
+                                .orderId(orderId)
                                 .build())
                         .build()
         );

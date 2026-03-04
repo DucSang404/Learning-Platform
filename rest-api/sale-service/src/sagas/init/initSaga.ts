@@ -1,35 +1,80 @@
 import RabbitClient from '~/service/utils/rabbitmq.service'
-import { MessageType } from '~/sagas/order/events'
-import { QueueName } from '~/sagas/order/queues'
-import orderHandler from '~/sagas/handler/order.handler'
-import { RegisterUpdatedPayload } from '../order/dtos'
 import { EventEnvelope } from '../events/envelope'
 import Logger from '~/utils/logger'
+
+// Buy VIP Domain
+import vipHandler from '~/sagas/buy_vip/vip.handler'
+import { VipMessageType } from '~/sagas/buy_vip/vip.events'
+import { VipQueueName } from '~/sagas/buy_vip/vip.queues'
+import { VipRegisterUpdatedPayload, VipRegisterFailedPayload } from '~/sagas/buy_vip/vip.dtos'
+
+// Order Course Domain
+import courseHandler from '~/sagas/order_course/course.handler'
+import { CourseMessageType } from '~/sagas/order_course/course.events'
+import { CourseQueueName } from '~/sagas/order_course/course.queues'
+import { RegisterUpdatedPayload } from '~/sagas/order_course/course.dtos'
 
 export async function initSagas() {
   await RabbitClient.getInstance()
 
-  // tạo + bind queue (tạo queue nếu chưa có)
-  // routing key of register_service_queue is order.created.v1
-  await RabbitClient.bindQueueToExchange(QueueName.REGISTER_SERVICE_QUEUE, 'app_events', 'order.#', 'topic')
-  // routing key of order_service_queue is register.updated.v1
-  await RabbitClient.bindQueueToExchange(QueueName.ORDER_SERVICE_QUEUE, 'app_events', 'register.#', 'topic')
-  // routing key of notification_service_queue is notification.send.v1
-  await RabbitClient.bindQueueToExchange(QueueName.NOTIFICATION_SERVICE_QUEUE, 'app_events', 'notification.#', 'topic')
+  // ─── Course Order Domain ────────────────────────────────────────────────────
+  // Outbound: sale-service → course-service  (order.created.v1)
+  await RabbitClient.bindQueueToExchange(CourseQueueName.REGISTER_SERVICE_QUEUE, 'app_events', 'order.#', 'topic')
+  // Reply:   course-service → sale-service  (register.updated / register.update.failed)
+  await RabbitClient.bindQueueToExchange(CourseQueueName.ORDER_SERVICE_QUEUE, 'app_events', 'register.#', 'topic')
+  // Notifications
+  await RabbitClient.bindQueueToExchange(CourseQueueName.NOTIFICATION_SERVICE_QUEUE, 'app_events', 'notification.#', 'topic')
 
-  //bind consumer for order_service_queue
-  RabbitClient.registerConsumer<RegisterUpdatedPayload>(QueueName.ORDER_SERVICE_QUEUE, 'app_events', MessageType.REGISTER_UPDATED, async (parsed) => {
-    const data = parsed as EventEnvelope<RegisterUpdatedPayload>
-    if (!data.payload || !data.payload.orderId) {
-      throw new Error('Invalid payload for register.updated event')
+  // ─── VIP Domain ────────────────────────────────────────────────────────────
+  // Outbound: sale-service → user-service  (vip.register.created.v1)
+  await RabbitClient.bindQueueToExchange(VipQueueName.VIP_PACKAGE_REGISTER_SERVICE_QUEUE, 'app_events', 'vip.register.created.v1', 'topic')
+  // Reply:   user-service → sale-service  (vip.register.updated / vip.register.failed)
+  await RabbitClient.bindQueueToExchange(VipQueueName.VIP_ORDER_SERVICE_QUEUE, 'app_events', 'vip.register.updated.v1', 'topic')
+  await RabbitClient.bindQueueToExchange(VipQueueName.VIP_ORDER_SERVICE_QUEUE, 'app_events', 'vip.register.failed.v1', 'topic')
+
+  // ─── Course reply consumer ──────────────────────────────────────────────────
+  RabbitClient.registerConsumer<any>(
+    CourseQueueName.ORDER_SERVICE_QUEUE,
+    'app_events',
+    [CourseMessageType.REGISTER_UPDATED, CourseMessageType.REGISTER_UPDATE_FAILED],
+    async (parsed) => {
+      const data = parsed as EventEnvelope<any>
+      if (!data.payload || !data.payload.orderId) {
+        throw new Error(`Invalid payload for event ${data.type}`)
+      }
+
+      Logger.info(`[ORDER_SERVICE_QUEUE] received ${data.type}`)
+
+      if (data.type === CourseMessageType.REGISTER_UPDATED) {
+        await courseHandler.handleOrderCreated(data.payload as RegisterUpdatedPayload)
+      } else if (data.type === CourseMessageType.REGISTER_UPDATE_FAILED) {
+        await courseHandler.handleRegisterUpdateFailed(data.payload as RegisterUpdatedPayload)
+      } else {
+        Logger.warn(`Unhandled message type in ORDER_SERVICE_QUEUE: ${data.type}`)
+      }
     }
+  )
 
-    Logger.info(`data ${JSON.stringify(data)}`)
+  // ─── VIP reply consumer ─────────────────────────────────────────────────────
+  RabbitClient.registerConsumer<any>(
+    VipQueueName.VIP_ORDER_SERVICE_QUEUE,
+    'app_events',
+    [VipMessageType.VIP_REGISTER_UPDATED, VipMessageType.VIP_REGISTER_FAILED],
+    async (parsed) => {
+      const data = parsed as EventEnvelope<any>
+      if (!data.payload || !data.payload.orderId) {
+        throw new Error(`Invalid payload for VIP event ${data.type}`)
+      }
 
-    if (data.type === MessageType.REGISTER_UPDATED) {
-      await orderHandler.handleOrderCreated(data.payload)
-    } else {
-      await orderHandler.handleRegisterUpdateFailed(data.payload)
+      Logger.info(`[VIP_ORDER_SERVICE_QUEUE] received ${data.type}`)
+
+      if (data.type === VipMessageType.VIP_REGISTER_UPDATED) {
+        await vipHandler.handleVipRegisterUpdated(data.payload as VipRegisterUpdatedPayload)
+      } else if (data.type === VipMessageType.VIP_REGISTER_FAILED) {
+        await vipHandler.handleVipRegisterFailed(data.payload as VipRegisterFailedPayload)
+      } else {
+        Logger.warn(`Unhandled message type in VIP_ORDER_SERVICE_QUEUE: ${data.type}`)
+      }
     }
-  })
+  )
 }

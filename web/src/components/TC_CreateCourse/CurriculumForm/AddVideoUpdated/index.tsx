@@ -207,7 +207,7 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                 { type: 'application/json' }
             )
         )
-        formData.append('file', selectedFile)
+        // formData.append('file', selectedFile)
 
         // Start upload and store ID
         const uri = contentType === 'video' ? 'learning/lessons/video' : 'learning/lessons/article'

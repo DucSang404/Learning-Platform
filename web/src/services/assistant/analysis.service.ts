@@ -35,6 +35,17 @@ class AssistantAnalysisService {
         )
         return res.data as ApiResponse<AnalysisResult | null>
     }
+
+    /**
+     * Updates the summary of a specific chunk.
+     */
+    async updateChunkSummary(lessonId: string, chunkId: string, summary: string): Promise<ApiResponse<LessonChunk>> {
+        const res = await axiosClient.axiosInstance.patch(
+            `assistant/analysis/lessons/${lessonId}/chunks/${chunkId}/summary`,
+            { summary }
+        )
+        return res.data as ApiResponse<LessonChunk>
+    }
 }
 
 export default new AssistantAnalysisService()

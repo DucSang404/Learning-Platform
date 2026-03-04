@@ -13,6 +13,8 @@ import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors, UseFormHan
 import { CreationLessonFormValues } from '@/utils/create-course/curriculum'
 import useLoading from '@/hooks/useLoading.hook'
 import { AnalysisState } from '@/hooks/useAnalysis.hook'
+import { useAuthStore } from '@/stores/useAuth.stores'
+import { useVipUpgrade } from '@/contexts/VipUpgradeContext'
 
 interface Step2DetailsFormProps {
     videoSrc: string | null
@@ -58,9 +60,9 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
     const isPublic = watch('isPublic')
     const { loading, startLoading, stopLoading } = useLoading()
     const videoRef = useRef<HTMLVideoElement>(null)
-
-    // VIP flag (TODO: real auth)
-    const isVip = true
+    // Global VIP State
+    const isVip = useAuthStore((state) => state.data?.isVip ?? false)
+    const { openVipDialog } = useVipUpgrade()
 
     // Derived from injected analysis state
     const analysisData = analysisState.status === 'completed' ? analysisState.data : null
@@ -93,21 +95,6 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
     const handleMediaLoad = () => {
         setIsVideoLoading(false)
     }
-
-    // useEffect(() => {
-    //     const loadSuggestions = async () => {
-    //         setIsLoadingSuggestions(true)
-    //         try {
-    //             const data = await fetchMockAiSuggestions()
-    //             setSuggestions(data)
-    //         } catch (error) {
-    //             console.error("Failed to load AI suggestions", error)
-    //         } finally {
-    //             setIsLoadingSuggestions(false)
-    //         }
-    //     }
-    //     loadSuggestions()
-    // }, [])
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -206,7 +193,10 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                                 type="title"
                             />
                         ) : (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg">
+                            <div
+                                className="mt-2 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 hover:bg-yellow-50/50 cursor-pointer transition-colors border border-gray-200 px-3 py-2 rounded-lg"
+                                onClick={openVipDialog}
+                            >
                                 <Lock className="w-3.5 h-3.5" />
                                 <span className="inline-flex items-center gap-1 flex-wrap">Gợi ý AI dành cho thành viên <span className="font-semibold text-yellow-600 inline-flex items-center gap-0.5"><Crown className="w-3 h-3" />VIP</span> của <img src={learnovaLogo} alt="Learnova" className="h-3 w-auto object-contain" /></span>
                             </div>
@@ -238,7 +228,10 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                                 type="content"
                             />
                         ) : (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg">
+                            <div
+                                className="mt-2 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 hover:bg-yellow-50/50 cursor-pointer transition-colors border border-gray-200 px-3 py-2 rounded-lg"
+                                onClick={openVipDialog}
+                            >
                                 <Lock className="w-3.5 h-3.5" />
                                 <span className="inline-flex items-center gap-1 flex-wrap">Gợi ý AI dành cho thành viên <span className="font-semibold text-yellow-600 inline-flex items-center gap-0.5"><Crown className="w-3 h-3" />VIP</span> của <img src={learnovaLogo} alt="Learnova" className="h-3 w-auto object-contain" /></span>
                             </div>
@@ -270,6 +263,7 @@ const Step2DetailsForm: React.FC<Step2DetailsFormProps> = ({
                     analysisState={analysisState}
                     refetchAnalysis={refetchAnalysis}
                     onSeek={contentType === 'video' ? handleSeek : undefined}
+                    onUpgradeClick={openVipDialog}
                 />
 
                 {/* Action Buttons */}

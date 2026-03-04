@@ -7,6 +7,7 @@ class OrderHistoryService {
         id: string;
         total: number;
         created_at: Date;
+        type: string;
         items: {
             course_id: string;
             // price: number;
@@ -18,14 +19,18 @@ class OrderHistoryService {
         }[];
     }[]> {
         const orderHistory = await prismaService.order.findMany({
-            where: { 
+            where: {
                 user_id: userId,
                 status: OrderStatus.Completed
+            },
+            orderBy: {
+                created_at: 'desc'
             },
             select: {
                 id: true,
                 total: true,
                 created_at: true,
+                type: true,
                 items: {
                     select: {
                         course_id: true,
@@ -58,6 +63,7 @@ class OrderHistoryService {
                 id: order.id,
                 total: order.total,
                 created_at: order.created_at,
+                type: order.type,
                 items: enrichedItems
             }
         })

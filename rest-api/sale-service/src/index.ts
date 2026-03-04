@@ -8,6 +8,8 @@ import { env } from './config/env';
 import indexRoute from '~/routes';
 import { initSagas } from './sagas/init/initSaga';
 import Logger from './utils/logger';
+import prismaService from './service/utils/prisma.service';
+import { DEFAULT_VIP_PACKAGE } from './config/vip.config';
 const { startGrpcServer } = require('./grpc/server/saleServer.grpc')
 
 const app = express();
@@ -41,17 +43,31 @@ startGrpcServer();
 
 const PORT = env.PORT || 4000;
 
-RabbitMQService.getInstance().then(() => {
-  Logger.info('Connected to RabbitMQ');
-  initSagas();
-}).catch((error) => {
-  Logger.error(`Failed to connect to RabbitMQ: ${error}`);
-});
+async function bootstrap() {
+  try {
+    // 1. Connect to RabbitMQ
+    await RabbitMQService.getInstance();
+    Logger.info('Connected to RabbitMQ');
+    initSagas();
 
-// elasticSearch.ping().then(() => {
-//   console.log('Connected to ElasticSearch');
-// }).catch((error) => {
-//   console.error('Failed to connect to ElasticSearch:', error);
-// });
+    // 2. Check and seed default VIP Package
+    const vipCount = await prismaService.vipPackage.count();
+    if (vipCount === 0) {
+      await prismaService.vipPackage.create({
+        data: DEFAULT_VIP_PACKAGE
+      });
+      Logger.info(`Seeded default VIP Package (${DEFAULT_VIP_PACKAGE.duration_months} month - ${DEFAULT_VIP_PACKAGE.price} VND)`);
+    } else {
+      Logger.info(`Found ${vipCount} VIP Package(s) in database`);
+    }
 
-app.listen(PORT, () => Logger.info(`Learnova:sale_service running http://localhost:${PORT}`));
+    // 3. Start Express server
+    app.listen(PORT, () => Logger.info(`Learnova:sale_service running http://localhost:${PORT}`));
+
+  } catch (error) {
+    Logger.error(`Bootstrap failed: ${error}`);
+    process.exit(1);
+  }
+}
+
+bootstrap();

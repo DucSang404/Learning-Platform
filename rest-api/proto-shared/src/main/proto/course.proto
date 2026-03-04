@@ -103,3 +103,12 @@ message IsInstructorRequest {
 message IsInstructorResponse {
   bool isInstructor = 1;
 }
+
+message CanEditLessonRequest {
+  string lessonId = 1;
+  string instructorId = 2;
+}
+
+message CanEditLessonResponse {
+  bool canEdit = 1;
+}

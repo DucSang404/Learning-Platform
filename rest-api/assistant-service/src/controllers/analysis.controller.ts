@@ -53,6 +53,26 @@ class AnalysisController {
             next(error)
         }
     }
+
+    /**
+     * PATCH /lessons/:lessonId/chunks/:chunkId/summary
+     */
+    updateChunkSummary = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const chunkId = String(req.params.chunkId)
+            const { summary } = req.body
+
+            const updatedChunk = await analysisService.updateChunkSummary(chunkId, summary)
+
+            sendResponse(res, {
+                code: StatusCodes.OK,
+                message: 'Cập nhật tóm tắt thành công',
+                result: updatedChunk
+            })
+        } catch (error) {
+            next(error)
+        }
+    }
 }
 
 export default new AnalysisController()

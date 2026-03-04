@@ -51,7 +51,8 @@ const AuthPage: React.FC<SlidingLoginSignupProps> = ({ isSignUpMode, setIsSignUp
           username: r.username || r.userName,
           email: r.email,
           avatarUrl: r.avatarUrl,
-          role: r.role
+          role: r.role,
+          isVip: r.isVip ?? false
         } as any)
         toast.success('Đăng nhập thành công!')
         const role = r.role
