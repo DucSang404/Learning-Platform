@@ -6,8 +6,10 @@ import vnpayService from '~/service/utils/vnpay.service';
 import momoService from '../utils/momo.service';
 import rabbitMQService from '~/service/utils/rabbitmq.service';
 import { createEnvelope } from '~/sagas/events/envelope';
-import { OrderCreatedPayload, VipRegisterCreatedPayload } from '~/sagas/order/dtos';
-import { MessageType } from '~/sagas/order/events';
+import { OrderCreatedPayload } from '~/sagas/order_course/course.dtos';
+import { VipRegisterCreatedPayload } from '~/sagas/buy_vip/vip.dtos';
+import { CourseMessageType } from '~/sagas/order_course/course.events';
+import { VipMessageType } from '~/sagas/buy_vip/vip.events';
 import Logger from '~/utils/logger';
 
 class OrderPaymentService {
@@ -40,10 +42,10 @@ class OrderPaymentService {
                     : await this.validateVnpayCallback(query);
             orderId = id;
 
-            // Step 2. Mark order as completed
+            // Step 2. Mark order as processing
             const updated = await prismaService.order.update({
                 where: { id: orderId },
-                data: { status: OrderStatus.Completed },
+                data: { status: OrderStatus.Processing },
                 include: { items: true },
             });
 
@@ -59,13 +61,15 @@ class OrderPaymentService {
             };
 
             const envelope = createEnvelope({
-                type: MessageType.ORDER_CREATED,
+                type: CourseMessageType.ORDER_CREATED,
                 payload,
                 correlationId: `order-${updated.id}`,
             });
 
+            Logger.info(`Publishing ORDER_CREATED: ${JSON.stringify(envelope)}`);
+
             try {
-                await rabbitMQService.sendMessageTopic(envelope, 'app_events', MessageType.ORDER_CREATED, 'topic', true);
+                await rabbitMQService.sendMessageTopic(envelope, 'app_events', CourseMessageType.ORDER_CREATED, 'topic', true);
             } catch (err) {
                 Logger.error(`Publish OrderCreated failed (${provider}): ${err}`);
                 await this.markOrderCancel(orderId);
@@ -114,14 +118,14 @@ class OrderPaymentService {
             };
 
             const envelope = createEnvelope({
-                type: MessageType.VIP_REGISTER_CREATED,
+                type: VipMessageType.VIP_REGISTER_CREATED,
                 payload,
                 correlationId: `viporder-${order.id}`,
             });
 
             try {
-                // Publish to app_events exchange with topic MessageType.VIP_REGISTER_CREATED
-                await rabbitMQService.sendMessageTopic(envelope, 'app_events', MessageType.VIP_REGISTER_CREATED, 'topic', true);
+                // Publish to app_events exchange with topic VipMessageType.VIP_REGISTER_CREATED
+                await rabbitMQService.sendMessageTopic(envelope, 'app_events', VipMessageType.VIP_REGISTER_CREATED, 'topic', true);
             } catch (err) {
                 Logger.error(`Publish VIP_REGISTER_CREATED failed (${provider}): ${err}`);
                 await this.markOrderCancel(orderId);

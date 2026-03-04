@@ -10,6 +10,7 @@ class NotificationHandler {
   // Process when receiving event register.created.v1 -> save order with status Completed
   async handleSendEmailConfirm(message: NotificationPayload) {
     try {
+      Logger.info(`[NotificationHandler] Received email confirmation request for ${message.customer_email}. Items: ${message.items?.length}. Type: ${(message as any).orderType}`);
       const notification = {
         type: QueueNameEnum.ORDERCONFIRM,
         email: message.customer_email,

@@ -86,6 +86,7 @@ enum DiscountType {
 enum OrderStatus {
   Cancel
   Pending
+  Processing
   Completed
 }
 

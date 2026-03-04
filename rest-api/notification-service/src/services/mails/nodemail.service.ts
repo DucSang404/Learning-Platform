@@ -77,6 +77,7 @@ class NodeMailService {
       }
 
       case QueueNameEnum.ORDERCONFIRM: {
+        Logger.info(`[NodeMailService] Handling ORDERCONFIRM. Processing for: ${(notification as any).payload?.customer_email || (notification as any).email}. isVip: ${(notification as any).payload?.orderType === 'VIP'}`);
         // Order confirmation notification - payload should contain customer and items
         const orderNotification = notification as {
           email?: string | string[]
@@ -143,6 +144,7 @@ class NodeMailService {
     }
 
     await this.send(mailPayload)
+    Logger.info(`Email sent: ${mailPayload.subject}`)
   }
 }
 
