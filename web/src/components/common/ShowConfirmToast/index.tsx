@@ -77,11 +77,11 @@ export function showConfirmToast({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-3">
+        <div className="mt-4 flex items-center justify-end gap-3 pointer-events-auto relative z-[999999]">
           <button
             type="button"
             onClick={handleCancel}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200 relative z-[999999] pointer-events-auto"
             aria-label={cancelLabel}
           >
             {/* optional cancel icon */}
@@ -94,10 +94,10 @@ export function showConfirmToast({
           <button
             type="button"
             onClick={handleConfirm}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold shadow-sm hover:bg-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold shadow-sm hover:bg-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300 relative z-[999999] pointer-events-auto"
             aria-label={confirmLabel}
           >
-            
+
             <span>{confirmLabel}</span>
           </button>
         </div>

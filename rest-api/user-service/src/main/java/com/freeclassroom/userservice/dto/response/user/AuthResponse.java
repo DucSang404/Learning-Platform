@@ -17,4 +17,5 @@ public class AuthResponse {
     String userName;
     String avatarUrl;
     String role;
+    Boolean isVip;
 }

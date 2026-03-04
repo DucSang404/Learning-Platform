@@ -54,7 +54,8 @@ const SignInForm = ({
           username: r.username || r.userName,
           email: r.email,
           avatarUrl: r.avatarUrl,
-          role: r.role
+          role: r.role,
+          isVip: r.isVip ?? false
         })
         toast.success('Đăng nhập thành công!')
         const role = response.result.role

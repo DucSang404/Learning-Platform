@@ -7,6 +7,7 @@ import {
     Check,
     X,
     PlayCircle,
+    RefreshCw,
 } from 'lucide-react'
 import CustomButton from '@/components/common/Button'
 import CustomTextarea from '@/components/common/Textarea'
@@ -14,7 +15,7 @@ import { LessonChunk } from '@/types/ai'
 
 interface ChunkCardProps {
     chunk: LessonChunk
-    onSaveSummary: (id: string, newSummary: string) => void
+    onSaveSummary: (id: string, newSummary: string) => Promise<void> | void
     /** Seek the video preview to this chunk's start time */
     onSeek?: (startTime: string | null) => void
 }
@@ -24,9 +25,18 @@ const ChunkCard: React.FC<ChunkCardProps> = ({ chunk, onSaveSummary, onSeek }) =
     const [isEditing, setIsEditing] = useState(false)
     const [draftSummary, setDraftSummary] = useState(chunk.summary ?? '')
 
-    const handleSave = () => {
-        onSaveSummary(chunk.id, draftSummary)
-        setIsEditing(false)
+    const [isSaving, setIsSaving] = useState(false)
+
+    const handleSave = async () => {
+        try {
+            setIsSaving(true)
+            await onSaveSummary(chunk.id, draftSummary)
+            setIsEditing(false)
+        } catch (error) {
+            console.error('Save failed:', error)
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const handleCancel = () => {
@@ -140,10 +150,11 @@ const ChunkCard: React.FC<ChunkCardProps> = ({ chunk, onSaveSummary, onSeek }) =
                                     />
                                     <CustomButton
                                         type="button"
-                                        label="Lưu"
-                                        icon={<Check className="w-3.5 h-3.5 mr-1" />}
+                                        label={isSaving ? "Đang lưu" : "Lưu"}
+                                        icon={isSaving ? <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}
                                         className="rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-xs px-3 h-8"
                                         onClick={handleSave}
+                                        disabled={isSaving}
                                     />
                                 </div>
                             </>
