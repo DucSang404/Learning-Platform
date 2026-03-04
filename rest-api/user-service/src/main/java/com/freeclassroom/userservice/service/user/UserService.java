@@ -11,6 +11,7 @@ import com.freeclassroom.userservice.dto.response.auth.CheckForgotPasswordRespon
 import com.freeclassroom.userservice.dto.response.user.GetUserResponse;
 import com.freeclassroom.userservice.dto.response.user.MyProfileResponse;
 import com.freeclassroom.userservice.dto.response.user.UserResponse;
+import com.freeclassroom.userservice.dto.response.user.VipStatusResponse;
 import com.freeclassroom.userservice.entity.certificate.Certificate;
 import com.freeclassroom.userservice.entity.redis.OTPForgetPassword;
 import com.freeclassroom.userservice.entity.redis.PendingUserEntity;
@@ -39,6 +40,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -342,6 +345,53 @@ public class UserService implements IUserService {
                                 .name(user.getName())
                                 .build()
                 )
+                .build();
+    }
+
+    @Override
+    public ApiResponse<VipStatusResponse> getVipStatus(String userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomExeption(ErrorCode.USER_NOT_FOUND));
+
+        boolean isVip = Boolean.TRUE.equals(user.getIsVip());
+
+        if (!isVip || user.getUpdateVipAt() == null || user.getDurationOfVip() == null) {
+            return ApiResponse.<VipStatusResponse>builder()
+                    .code(HttpStatus.OK.value())
+                    .message("Người dùng không phải thành viên VIP.")
+                    .result(VipStatusResponse.builder().isVip(false).build())
+                    .build();
+        }
+
+        LocalDateTime activatedAt = user.getUpdateVipAt();
+        LocalDateTime expiresAt = activatedAt.plusMonths(user.getDurationOfVip());
+        long daysRemaining = ChronoUnit.DAYS.between(LocalDateTime.now(), expiresAt);
+
+        // VIP expired — auto-reset flag
+        if (daysRemaining <= 0) {
+            user.setIsVip(false);
+            userRepository.save(user);
+            return ApiResponse.<VipStatusResponse>builder()
+                    .code(HttpStatus.OK.value())
+                    .message("Gói VIP của bạn đã hết hạn.")
+                    .result(VipStatusResponse.builder()
+                            .isVip(false)
+                            .daysRemaining(0L)
+                            .expiresAt(expiresAt)
+                            .build())
+                    .build();
+        }
+
+        return ApiResponse.<VipStatusResponse>builder()
+                .code(HttpStatus.OK.value())
+                .message("Lấy trạng thái VIP thành công.")
+                .result(VipStatusResponse.builder()
+                        .isVip(true)
+                        .durationMonths(user.getDurationOfVip())
+                        .activatedAt(activatedAt)
+                        .expiresAt(expiresAt)
+                        .daysRemaining(daysRemaining)
+                        .build())
                 .build();
     }
 }

@@ -11,6 +11,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 @Entity
 @AllArgsConstructor
@@ -37,6 +38,15 @@ public class UserEntity extends AbstractEntity {
 
     @Enumerated(EnumType.STRING)
     EnumAccountStatus status;
+
+    @Column(name = "is_vip")
+    Boolean isVip = false;
+
+    @Column(name = "duration_of_vip")
+    Integer durationOfVip;
+
+    @Column(name = "update_vip_at")
+    LocalDateTime updateVipAt;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

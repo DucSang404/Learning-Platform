@@ -18,6 +18,7 @@ public class MyProfileResponse {
     String position;
     String email;
     String username;
+    Boolean isVip;
 
     Set<ExpertiseReponse> expertises;
 }

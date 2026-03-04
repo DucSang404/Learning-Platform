@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { vnpayConfig } from '../../config/payment'
 import ApiError from '../../middleware/ApiError'
 import StatusCodes from 'http-status-codes'
+import { OrderType } from '@prisma/client'
 
 export class VnpayService {
   // Validate VnPay config
@@ -67,6 +68,7 @@ export class VnpayService {
     amount: number
     orderId: string
     ipAddr?: string
+    type?: string
   }): Promise<{ payUrl: string; deeplink: string; orderId: string }> {
     try {
       // Validate config and input
@@ -83,6 +85,11 @@ export class VnpayService {
       // Expiration time 60 minutes
       const expireDate = dateFormat(new Date(date.getTime() + 60 * 60 * 1000), 'yyyymmddHHmmss')
 
+      let returnUrl = vnpayConfig.vnp_redirectUrl;
+      if (data.type === OrderType.VIP_SUBSCRIPTION) {
+        returnUrl = returnUrl.replace('/verify-order/', '/verify-vip-order/');
+      }
+
       // Create VnPay parameters
       const vnp_Params: { [key: string]: string } = {
         vnp_Version: '2.1.0',
@@ -95,7 +102,7 @@ export class VnpayService {
         vnp_Locale: 'vn',
         vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
         vnp_OrderType: 'other',
-        vnp_ReturnUrl: vnpayConfig.vnp_redirectUrl,
+        vnp_ReturnUrl: returnUrl,
         vnp_ExpireDate: expireDate,
         vnp_TxnRef: orderId
       }

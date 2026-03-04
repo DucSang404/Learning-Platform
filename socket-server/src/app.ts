@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import http from 'http';
 import { registerChatHandlers } from './socket/events/chat.handler';
+import logger from './utils/logger';
 
 export const initSocket = async (httpServer: http.Server) => {
     const io = new Server(httpServer, {
@@ -9,7 +10,7 @@ export const initSocket = async (httpServer: http.Server) => {
 
 
     io.on("connection", (socket) => {
-        console.log(`Client connected: ${socket.id}`);
+        logger.info(`Client connected: ${socket.id}`);
         registerChatHandlers(io, socket);
     })
 }

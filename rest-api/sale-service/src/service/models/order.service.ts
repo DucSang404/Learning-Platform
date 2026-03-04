@@ -3,7 +3,7 @@ import { CreateOrderDto } from '~/dto/request/order.dto';
 import userClientGrpc from '~/grpc/userClient.grpc';
 import courseClientGrpc from '~/grpc/courseClient.grpc';
 import ApiError from '~/middleware/ApiError';
-import { OrderStatus, Order } from '@prisma/client';
+import { OrderStatus, Order, OrderType } from '@prisma/client';
 import redisService from '../utils/redis.service';
 import discountService from './discount.service';
 import vnpayService from '../../service/utils/vnpay.service'
@@ -11,7 +11,7 @@ import { OrderDto } from '~/dto/response/order.dto';
 import momoService from '../utils/momo.service';
 
 class OrderService {
-    async createOrder(orderData: CreateOrderDto, userId: string) : Promise<{
+    async createOrder(orderData: CreateOrderDto, userId: string): Promise<{
         user_id: string;
         customer_name: string;
         customer_email: string;
@@ -25,7 +25,7 @@ class OrderService {
         // check user 
         const user = await userClientGrpc.getUser(userId);
         if (!user) {
-            throw new ApiError(200,'Người dùng không tồn tại !');
+            throw new ApiError(200, 'Người dùng không tồn tại !');
         }
 
         //check sale is bued by user
@@ -67,7 +67,7 @@ class OrderService {
                 course_id: item.id as string,
                 title: item.title as string,
                 price: item.final_price as number,
-                instructor_name: item.instructor.name as string, 
+                instructor_name: item.instructor.name as string,
                 image: item.thumbnail_url as string
             })),
             user_id: userId,
@@ -160,9 +160,63 @@ class OrderService {
             });
         } else if (paymentMethod === 'MOMO') {
             payUri = await momoService.createPayment({
-                 amount,
-                 orderId: createdOrder.id,
-                 ipAddr: ipAddress || '127.0.0.1'
+                amount,
+                orderId: createdOrder.id,
+                ipAddr: ipAddress || '127.0.0.1'
+            });
+        }
+
+        return {
+            ...createdOrder,
+            payment: {
+                payUrl: payUri ? payUri.payUrl : ''
+            }
+        }
+    }
+
+    async processVipPayment(userId: string, receiveEmail: string, paymentMethod: string, ipAddress?: string): Promise<Order & { payment?: { payUrl: string } }> {
+        // check user 
+        const user = await userClientGrpc.getUser(userId);
+        if (!user) {
+            throw new ApiError(404, 'Người dùng không tồn tại !');
+        }
+
+        // Fetch VIP package from DB instead of hardcoding
+        const vipPackage = await prismaService.vipPackage.findFirst();
+        if (!vipPackage) {
+            throw new ApiError(404, 'Không tìm thấy thông tin gói VIP trên hệ thống!');
+        }
+
+        const vipPrice = vipPackage.price;
+
+        // save VIP order directly to database
+        const createdOrder = await prismaService.order.create({
+            data: {
+                user_id: userId,
+                customer_name: user.name as string,
+                customer_email: receiveEmail || user.email as string,
+                total: vipPrice,
+                status: OrderStatus.Pending,
+                type: OrderType.VIP_SUBSCRIPTION,
+                // no items for VIP subscription
+            }
+        });
+
+        // Generate VNPAY / MOMO payment URL
+        let payUri: { payUrl: string } | null = null
+        if (paymentMethod === 'VNPAY') {
+            payUri = await vnpayService.createPayment({
+                amount: vipPrice,
+                orderId: createdOrder.id,
+                ipAddr: ipAddress || '127.0.0.1',
+                type: OrderType.VIP_SUBSCRIPTION
+            });
+        } else if (paymentMethod === 'MOMO') {
+            payUri = await momoService.createPayment({
+                amount: vipPrice,
+                orderId: createdOrder.id,
+                ipAddr: ipAddress || '127.0.0.1',
+                type: OrderType.VIP_SUBSCRIPTION
             });
         }
 
@@ -184,6 +238,7 @@ class OrderService {
                 customer_email: true,
                 total: true,
                 status: true,
+                type: true,
                 discount: {
                     select: {
                         id: true,
@@ -230,6 +285,7 @@ class OrderService {
             customer_email: order.customer_email,
             total: order.total,
             status: order.status,
+            type: order.type,
             discount: order.discount ? {
                 code: order.discount.code,
                 type: order.discount.type,

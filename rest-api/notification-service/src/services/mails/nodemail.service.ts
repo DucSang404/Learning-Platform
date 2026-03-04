@@ -77,16 +77,19 @@ class NodeMailService {
       }
 
       case QueueNameEnum.ORDERCONFIRM: {
+        Logger.info(`[NodeMailService] Handling ORDERCONFIRM. Processing for: ${(notification as any).payload?.customer_email || (notification as any).email}. isVip: ${(notification as any).payload?.orderType === 'VIP'}`);
         // Order confirmation notification - payload should contain customer and items
         const orderNotification = notification as {
           email?: string | string[]
           to?: string | string[]
-          payload?: unknown
+          payload?: any
         }
 
-        subject = 'Xác nhận đơn hàng của bạn'
+        const isVipOrder = orderNotification.payload?.orderType === 'VIP'
+
+        subject = isVipOrder ? 'Cảm ơn bạn đã đăng ký VIP!' : 'Xác nhận đơn hàng của bạn'
         to = orderNotification.email || orderNotification.to || []
-        templateName = 'order-confirmation.html'
+        templateName = isVipOrder ? 'vip-confirmation.html' : 'order-confirmation.html'
         templateData = orderNotification.payload || orderNotification
         break
       }
@@ -125,7 +128,6 @@ class NodeMailService {
         }
         break
       }
-      // Thêm các loại khác nếu cần
       default:
         Logger.info(`Chưa thể gửi mail to ${notification.email}: ${notification.type}`)
         return
@@ -142,6 +144,7 @@ class NodeMailService {
     }
 
     await this.send(mailPayload)
+    Logger.info(`Email sent: ${mailPayload.subject}`)
   }
 }
 

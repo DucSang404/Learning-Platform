@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { StatusCodes } from 'http-status-codes'
 import ApiError from '~/middleware/ApiError'
 import Logger from '~/utils/logger'
+import { OrderType } from '@prisma/client'
 // import prisma from '~/prisma.service'
 
 // DTO
@@ -11,6 +12,7 @@ export interface CreatePaymentInput {
   amount: number
   orderId: string
   ipAddr?: string
+  type?: string
 }
 
 export interface PaymentVerifyResult {
@@ -74,7 +76,10 @@ export class MomoService {
     const requestId = orderId
 
     // Determine redirect URL based on platform
-    const redirectUrl = momoConfig.redirectUrl
+    let redirectUrl = momoConfig.redirectUrl
+    if (data.type === OrderType.VIP_SUBSCRIPTION) {
+      redirectUrl = redirectUrl.replace('/verify-order/', '/verify-vip-order/')
+    }
 
     // Parameters
     const params = {

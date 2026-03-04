@@ -81,6 +81,26 @@ class CourseGrpcClient {
         })
     }
 
+    // check can edit lesson
+    async canEditLesson(lessonId: string, instructorId: string): Promise<boolean> {
+        return new Promise<boolean>((resolve, reject) => {
+            const req = { lessonId: lessonId, instructorId: instructorId }
+            this.courseClient.canEditLesson(req, (err: any, response: any) => {
+                if (err) {
+                    Logger.error(`grpc canEditLesson error: ${err}`)
+                    return reject(err)
+                }
+
+                if (!response || typeof response.canEdit !== 'boolean') {
+                    Logger.warn(`grpc canEditLesson: invalid response, returning false: ${response}`)
+                    return resolve(false)
+                }
+
+                resolve(response.canEdit)
+            })
+        })
+    }
+
     // optional helper to await readiness from elsewhere
     async isReady(timeoutMs = 5000): Promise<boolean> {
         return new Promise((resolve) => {

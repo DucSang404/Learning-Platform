@@ -106,6 +106,7 @@ public class AuthenticationService implements IAuthenticationService {
                             .map(RoleEntity::getName)
                             .collect(Collectors.joining(","))
                     )
+                    .isVip(account.getIsVip())
                     .build();
 
             return ApiResponse.<AuthResponse>builder()
@@ -200,6 +201,7 @@ public class AuthenticationService implements IAuthenticationService {
                         .userId(account.getId())
                         .name(account.getName())
                         .avatarUrl(account.getImage())
+                        .isVip(account.getIsVip())
                         .build())
                 .build();
     }
@@ -247,6 +249,7 @@ public class AuthenticationService implements IAuthenticationService {
                                 .map(RoleEntity::getName)
                                 .collect(Collectors.joining(","))
                         )
+                        .isVip(user.getIsVip())
                         .build())
                 .build();
     }

@@ -31,6 +31,16 @@ export class AnalysisService {
     }
 
     /**
+     * Updates the summary of a specific lesson chunk.
+     */
+    async updateChunkSummary(chunkId: string, summary: string) {
+        return prismaService.lessonChunk.update({
+            where: { id: chunkId },
+            data: { summary }
+        })
+    }
+
+    /**
      * Long-poll: waits until summarization completes (via Redis pub/sub) or
      * times out after LONG_POLL_TIMEOUT_MS.
      *
