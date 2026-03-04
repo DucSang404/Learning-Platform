@@ -17,23 +17,39 @@ class VipHandler {
 
     async handleVipRegisterUpdated(message: VipRegisterUpdatedPayload) {
         try {
-            const order = await prismaService.order.findFirst({ where: { id: message.orderId } });
-            if (!order) throw new Error('VIP Order not found');
-
-            await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
-
-            const orderData = await orderService.getOrderInfo(order.user_id, message.orderId);
-
-            await this.sendMessage(
-                VipMessageType.NOTIFICATION_SEND,
-                { ...orderData, orderType: 'VIP' },
-                `viporder-${order.id}`
-            );
+            const order = await prismaService.$transaction(async (tx) => {
+                const order = await tx.order.findFirst({ where: { id: message.orderId } });
+                if (!order) throw new Error('VIP Order not found');
+                await tx.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
+                return order;
+            });
 
             Logger.info(`Successfully completed VIP order: ${message.orderId}`);
+
+            // Fire-and-forget: notification failure should NOT trigger rollback
+            orderService.getOrderInfo(order.user_id, message.orderId)
+                .then(orderData => this.sendMessage(
+                    VipMessageType.NOTIFICATION_SEND,
+                    { ...orderData, orderType: 'VIP' },
+                    `viporder-${order.id}`
+                ))
+                .catch(err => Logger.error(`Failed to send VIP notification for order ${message.orderId}: ${err}`));
+
         } catch (error) {
             Logger.error(`Error completing VIP order: ${error}`);
-            await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } }).catch(() => { });
+            await Promise.all([
+                prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } }).catch(() => { }),
+                this.sendMessage(
+                    VipMessageType.VIP_REGISTER_FAILED,
+                    {
+                        orderId: message.orderId,
+                        userId: message.userId,
+                        status: 'FAILED',
+                        reason: String(error)
+                    } satisfies VipRegisterFailedPayload,
+                    `viporder-${message.orderId}`
+                )
+            ]);
         }
     }
 

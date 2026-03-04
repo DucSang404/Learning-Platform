@@ -32,9 +32,18 @@ public class VipRegisterConsumerService {
     @RabbitListener(queues = RabbitMQConfig.VIP_REGISTER_QUEUE, containerFactory = "rabbitListenerContainerFactory")
     public void receiveMessage(EventEnvelope<VipRegisterCreatedPayload> event) {
         try {
-            if (event.getPayload() != null && "vip.register.created.v1".equals(event.getType())) {
+            log.info("Received message type: {}", event.getType());
+
+            if (event.getPayload() == null) {
+                log.error("Payload is null, sending failure message");
+                sendFailureMessage(event, "Invalid message: payload is null");
+                return;
+            }
+
+            if ("vip.register.created.v1".equals(event.getType())) {
                 handleVipRegisterCreated(event);
-            } else {
+            } else if ("vip.register.failed.v1".equals(event.getType())) {
+                log.error("Received failure event for VIP registration, rolling back transaction");
                 rollbackVipRegister(event);
             }
         } catch (Exception e) {
@@ -63,6 +72,10 @@ public class VipRegisterConsumerService {
         sendSuccessMessage(event);
     }
 
+    /**
+     * Rollback VIP status when transaction fails
+     * Sets isVip to false and clears duration
+     */
     @Transactional
     protected void rollbackVipRegister(EventEnvelope<VipRegisterCreatedPayload> event) {
         VipRegisterCreatedPayload payload = event.getPayload();
@@ -77,6 +90,7 @@ public class VipRegisterConsumerService {
         userRepository.save(user);
 
         log.info("Rollback VIP for user {} with orderId {}", userId, payload.getOrderId());
+        sendFailureMessage(event, "Transaction failed, rolled back VIP status");
     }
 
     // Send success message back to order service

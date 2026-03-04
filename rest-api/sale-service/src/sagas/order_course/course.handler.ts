@@ -18,26 +18,29 @@ class CourseHandler {
 
     async handleOrderCreated(message: RegisterUpdatedPayload) {
         try {
-            const order = await prismaService.order.findFirst({ where: { id: message.orderId } });
-            if (!order) throw new Error('Order not found');
-
-            await prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
-
-            const orderData = await orderService.getOrderInfo(order.user_id, message.orderId)
-
-            await this.sendMessage(
-                CourseMessageType.NOTIFICATION_SEND,
-                { ...orderData, orderType: 'COURSE' },
-                `order-${order.id}`
-            );
-
-            orderData.items.forEach(async (item) => {
-                cartService.removeFromCart(await cartService.getCartId(orderData.user_id), item.course_id.toString()).catch(err => {
-                    Logger.error(`Failed to remove order items from cart: ${err}`);
-                });
+            const order = await prismaService.$transaction(async (tx) => {
+                const order = await tx.order.findFirst({ where: { id: message.orderId } });
+                if (!order) throw new Error('Order not found');
+                await tx.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
+                return order;
             });
 
             Logger.info(`Successfully completed order: ${message.orderId}`);
+
+            // Fire-and-forget: notification & cart cleanup failure should NOT trigger rollback
+            orderService.getOrderInfo(order.user_id, message.orderId)
+                .then(async (orderData) => {
+                    await this.sendMessage(
+                        CourseMessageType.NOTIFICATION_SEND,
+                        { ...orderData, orderType: 'COURSE' },
+                        `order-${order.id}`
+                    );
+                    orderData.items.forEach(async (item) => {
+                        cartService.removeFromCart(await cartService.getCartId(orderData.user_id), item.course_id.toString())
+                            .catch(err => Logger.error(`Failed to remove order items from cart: ${err}`));
+                    });
+                })
+                .catch(err => Logger.error(`Failed to send course notification for order ${message.orderId}: ${err}`));
 
         } catch (error) {
             Logger.error(`Error completing order, rolling back: ${error}`);
