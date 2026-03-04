@@ -16,6 +16,8 @@ model Cart {
   updated_at DateTime    @updatedAt
 
   items      Cart_Item[]
+
+  @@map("carts")
 }
 
 model Cart_Item {
@@ -24,6 +26,8 @@ model Cart_Item {
   course_id String
 
   cart      Cart     @relation(fields: [cart_id], references: [id])
+
+  @@map("cart_items")
 }
 
 model Order {
@@ -41,6 +45,8 @@ model Order {
   payment     Payment?
   discount_id String?
   discount    Discount?     @relation(fields: [discount_id], references: [id])
+
+  @@map("orders")
 }
 
 model Order_Item {
@@ -51,6 +57,8 @@ model Order_Item {
   created_at DateTime @default(now())
 
   order      Order    @relation(fields: [order_id], references: [id])
+
+  @@map("order_items")
 }
 
 model Payment {
@@ -62,6 +70,8 @@ model Payment {
   created_at  DateTime @default(now())
 
   order       Order    @relation(fields: [order_id], references: [id])
+
+  @@map("payments")
 }
 
 model Discount {
@@ -76,6 +86,8 @@ model Discount {
   endDate        DateTime
 
   orders         Order[]
+
+  @@map("discounts")
 }
 
 enum DiscountType {
@@ -103,5 +115,7 @@ model VipPackage {
   duration_months Int      @default(1)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
+
+  @@map("vip_packages")
 }
 
