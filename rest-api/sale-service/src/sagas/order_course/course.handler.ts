@@ -6,6 +6,7 @@ import { createEnvelope } from '../events/envelope';
 import { CourseMessageType, CourseExchangeNames } from './course.events';
 import orderService from '~/service/models/order.service';
 import cartService from '~/service/models/cart.service';
+import redisService from '~/service/utils/redis.service';
 import Logger from '~/utils/logger';
 
 class CourseHandler {
@@ -24,6 +25,9 @@ class CourseHandler {
                 await tx.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Completed } });
                 return order;
             });
+
+            // Unblock the payment handler waiting on Redis
+            await redisService.publishSagaResult(message.orderId, { success: true });
 
             Logger.info(`Successfully completed order: ${message.orderId}`);
 
@@ -45,10 +49,13 @@ class CourseHandler {
         } catch (error) {
             Logger.error(`Error completing order, rolling back: ${error}`);
 
-            const order = await prismaService.order.findFirst({
-                where: { id: message.orderId },
-                select: { id: true, user_id: true, total: true, items: { select: { course_id: true, price: true } } }
-            });
+            const [, order] = await Promise.all([
+                redisService.publishSagaResult(message.orderId, { success: false, reason: String(error) }),
+                prismaService.order.findFirst({
+                    where: { id: message.orderId },
+                    select: { id: true, user_id: true, total: true, items: { select: { course_id: true, price: true } } }
+                })
+            ]);
 
             await this.sendMessage(
                 CourseMessageType.ORDER_COMPLETION_FAILED,

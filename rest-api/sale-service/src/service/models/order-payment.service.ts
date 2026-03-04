@@ -5,12 +5,15 @@ import { StatusCodes } from 'http-status-codes';
 import vnpayService from '~/service/utils/vnpay.service';
 import momoService from '../utils/momo.service';
 import rabbitMQService from '~/service/utils/rabbitmq.service';
+import redisService, { SagaResult } from '~/service/utils/redis.service';
 import { createEnvelope } from '~/sagas/events/envelope';
 import { OrderCreatedPayload } from '~/sagas/order_course/course.dtos';
 import { VipRegisterCreatedPayload } from '~/sagas/buy_vip/vip.dtos';
 import { CourseMessageType } from '~/sagas/order_course/course.events';
 import { VipMessageType } from '~/sagas/buy_vip/vip.events';
 import Logger from '~/utils/logger';
+
+const SAGA_TIMEOUT_MS = 30_000
 
 class OrderPaymentService {
     async verifyOrderForMomo(query: any) {
@@ -36,7 +39,7 @@ class OrderPaymentService {
         let orderId = '';
         try {
             // Step 1. Validate callback and fetch order
-            const { order, orderId: id, amount } =
+            const { order, orderId: id } =
                 provider === 'momo'
                     ? await this.validateMomoCallback(query)
                     : await this.validateVnpayCallback(query);
@@ -49,15 +52,18 @@ class OrderPaymentService {
                 include: { items: true },
             });
 
-            // Step 3. Publish OrderCreated event
+            // Step 3. Subscribe BEFORE publishing to avoid race condition
+            const sagaResultPromise = redisService.waitForMessage<SagaResult>(
+                `saga:result:${orderId}`,
+                SAGA_TIMEOUT_MS
+            );
+
+            // Step 4. Publish OrderCreated event
             const payload: OrderCreatedPayload = {
                 orderId: updated.id,
                 userId: updated.user_id,
                 amount: updated.total,
-                items: updated.items.map((i: any) => ({
-                    course_id: i.course_id,
-                    price: i.price,
-                })),
+                items: updated.items.map((i: any) => ({ course_id: i.course_id, price: i.price })),
             };
 
             const envelope = createEnvelope({
@@ -76,8 +82,18 @@ class OrderPaymentService {
                 return this.buildResponse(false, orderId, null, 'Không thể đẩy event thanh toán', '98');
             }
 
-            // Success
+            // Step 5. Wait for saga result via Redis Pub/Sub
+            Logger.info(`Waiting for saga result on channel saga:result:${orderId} (timeout: ${SAGA_TIMEOUT_MS}ms)`)
+            const sagaResult = await sagaResultPromise;
+
+            if (!sagaResult.success) {
+                Logger.error(`Saga failed for order ${orderId}: ${sagaResult.reason}`);
+                return this.buildResponse(false, orderId, null, sagaResult.reason || 'Xử lý giao dịch thất bại', '99');
+            }
+
+            Logger.info(`Saga completed successfully for order ${orderId}`);
             return this.buildResponse(true, orderId, updated, `Thanh toán đơn hàng ${orderId} thành công`, '00');
+
         } catch (err: any) {
             Logger.error(`Error verifying order (${provider}): ${err}`);
             if (orderId) await this.markOrderCancel(orderId);
@@ -98,23 +114,25 @@ class OrderPaymentService {
         let orderId = '';
         try {
             // Step 1. Validate callback and fetch order
-            const { order, orderId: id, amount } =
+            const { order, orderId: id } =
                 provider === 'momo'
                     ? await this.validateMomoCallback(query)
                     : await this.validateVnpayCallback(query);
             orderId = id;
 
-            // Step 2. Do NOT mark order as completed yet, wait for user service
-            // Step 3. Publish VIP_REGISTER_CREATED event
-            // Find the VIP package configuration duration (assume 1 from the default config for now, could also fetch it or store it in order metadata)
-            // But since it's a test/prototype, we use 1 month as default duration based on current implementations
-            const durationMonths = 1;
+            // Step 2. Subscribe BEFORE publishing to avoid race condition
+            const sagaResultPromise = redisService.waitForMessage<SagaResult>(
+                `saga:result:${orderId}`,
+                SAGA_TIMEOUT_MS
+            );
 
+            // Step 3. Publish VIP_REGISTER_CREATED event
+            const durationMonths = 1;
             const payload: VipRegisterCreatedPayload = {
                 orderId: order.id,
                 userId: order.user_id,
                 amount: order.total,
-                durationMonths: durationMonths
+                durationMonths,
             };
 
             const envelope = createEnvelope({
@@ -124,7 +142,6 @@ class OrderPaymentService {
             });
 
             try {
-                // Publish to app_events exchange with topic VipMessageType.VIP_REGISTER_CREATED
                 await rabbitMQService.sendMessageTopic(envelope, 'app_events', VipMessageType.VIP_REGISTER_CREATED, 'topic', true);
             } catch (err) {
                 Logger.error(`Publish VIP_REGISTER_CREATED failed (${provider}): ${err}`);
@@ -132,8 +149,18 @@ class OrderPaymentService {
                 return this.buildResponse(false, orderId, null, 'Không thể đẩy event cập nhật VIP', '98');
             }
 
-            // Success verification but order is pending until User Service responds
-            return this.buildResponse(true, orderId, order, `Xác thực đơn hàng VIP ${orderId} thành công. Chờ xử lý...`, '00');
+            // Step 4. Wait for saga result from user-service via Redis Pub/Sub
+            Logger.info(`Waiting for VIP saga result on channel saga:result:${orderId} (timeout: ${SAGA_TIMEOUT_MS}ms)`)
+            const sagaResult = await sagaResultPromise;
+
+            if (!sagaResult.success) {
+                Logger.error(`VIP saga failed for order ${orderId}: ${sagaResult.reason}`);
+                return this.buildResponse(false, orderId, null, sagaResult.reason || 'Cập nhật VIP thất bại', '99');
+            }
+
+            Logger.info(`VIP saga completed successfully for order ${orderId}`);
+            return this.buildResponse(true, orderId, order, `Thanh toán VIP ${orderId} thành công`, '00');
+
         } catch (err: any) {
             Logger.error(`Error verifying VIP order (${provider}): ${err}`);
             if (orderId) await this.markOrderCancel(orderId);

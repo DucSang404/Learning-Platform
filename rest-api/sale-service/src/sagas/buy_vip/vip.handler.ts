@@ -5,6 +5,7 @@ import rabbitMQService from '~/service/utils/rabbitmq.service';
 import { createEnvelope } from '../events/envelope';
 import { VipMessageType, VipExchangeNames } from './vip.events';
 import orderService from '~/service/models/order.service';
+import redisService from '~/service/utils/redis.service';
 import Logger from '~/utils/logger';
 
 class VipHandler {
@@ -24,6 +25,9 @@ class VipHandler {
                 return order;
             });
 
+            // Unblock the VIP payment handler waiting on Redis
+            await redisService.publishSagaResult(message.orderId, { success: true });
+
             Logger.info(`Successfully completed VIP order: ${message.orderId}`);
 
             // Fire-and-forget: notification failure should NOT trigger rollback
@@ -38,6 +42,7 @@ class VipHandler {
         } catch (error) {
             Logger.error(`Error completing VIP order: ${error}`);
             await Promise.all([
+                redisService.publishSagaResult(message.orderId, { success: false, reason: String(error) }),
                 prismaService.order.update({ where: { id: message.orderId }, data: { status: OrderStatus.Cancel } }).catch(() => { }),
                 this.sendMessage(
                     VipMessageType.VIP_REGISTER_FAILED,
