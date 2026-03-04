@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import logger from '../../utils/logger';
 
 function getRoomId(instructorId: string, studentId: string) {
     const ids = [`instructor_${instructorId}`, `student_${studentId}`].sort();
@@ -9,7 +10,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
     socket.on("join_room", ({ instructorId, studentId }) => {
         const roomId = getRoomId(instructorId, studentId);
         socket.join(roomId);
-        console.log(`✅ Client ${socket.id} joined room: ${roomId}`);
+        logger.info(`✅ Client ${socket.id} joined room: ${roomId}`);
     });
 
     socket.on("server_message_send", (data) => {
@@ -20,7 +21,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         } else {
             roomId = getRoomId(peerId, senderId);
         }
-        console.log(`💬 Message from ${data.senderId} in ${roomId}:`, data.content);
+        logger.info(`💬 Message from ${data.senderId} in ${roomId}: ${data.content}`);
         io.to(roomId).emit("receive_message", {
             senderId: senderId,
             message: content,
@@ -36,7 +37,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
     socket.on("server_message_read", (data) => {
         const { conversationId, senderId, peerId } = data;
         const roomId = getRoomId(senderId, peerId);
-        console.log(`${data.peerId} read it`);
+        logger.info(`${data.peerId} read it`);
         io.to(roomId).emit("message_read", {
             conversationId,
             senderId,
@@ -78,7 +79,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         const { conversationId, messageId, instructorId, studentId } = data;
         const roomId = getRoomId(instructorId, studentId);
 
-        console.log(`🗑️ Message ${messageId} deleted in ${roomId}`);
+        logger.info(`🗑️ Message ${messageId} deleted in ${roomId}`);
         io.to(roomId).emit("message_delete", {
             conversationId,
             messageId,
@@ -89,7 +90,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         const { conversationId, deletedMessageId, newLastMessage, instructorId, studentId } = data;
         const roomId = getRoomId(instructorId, studentId);
 
-        console.log(`⚠️ Last message deleted in ${roomId}`);
+        logger.info(`⚠️ Last message deleted in ${roomId}`);
         io.to(roomId).emit("message_delete_last", {
             conversationId,
             deletedMessageId,
@@ -98,6 +99,6 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
     });
 
     socket.on("disconnect", () => {
-        console.log(`❌ User disconnected: ${socket.id}`);
+        logger.info(`❌ User disconnected: ${socket.id}`);
     });
 }
