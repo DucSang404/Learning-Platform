@@ -8,7 +8,7 @@ import { handleCourseApprovalEvent } from '~/services/course.service'
 import Logger from '~/utils/logger'
 
 const RabbitMQConf = {
-  protocol: 'amqps',
+  protocol: 'amqp',
   hostname: env.RABBIT_MQ_HOST,
   port: env.RABBIT_MQ_PORT,
   username: env.RABBIT_MQ_USER_NAME,

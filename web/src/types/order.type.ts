@@ -13,6 +13,7 @@ export enum OrderStatus {
 }
 
 export interface Order {
+  type: 'COURSE' | 'VIP_SUBSCRIPTION'
   items: OrderItem[]
   user_id: string
   customer_name: string

@@ -238,6 +238,7 @@ class OrderService {
                 customer_email: true,
                 total: true,
                 status: true,
+                type: true,
                 discount: {
                     select: {
                         id: true,
@@ -284,6 +285,7 @@ class OrderService {
             customer_email: order.customer_email,
             total: order.total,
             status: order.status,
+            type: order.type,
             discount: order.discount ? {
                 code: order.discount.code,
                 type: order.discount.type,
