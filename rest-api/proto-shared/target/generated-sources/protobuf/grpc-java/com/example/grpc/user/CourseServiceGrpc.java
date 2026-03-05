@@ -294,6 +294,68 @@ public final class CourseServiceGrpc {
     return getIsInstructorMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<com.example.grpc.course.GetCourseTagsRequest,
+      com.example.grpc.course.GetCourseTagsResponse> getGetCourseTagsMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "getCourseTags",
+      requestType = com.example.grpc.course.GetCourseTagsRequest.class,
+      responseType = com.example.grpc.course.GetCourseTagsResponse.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<com.example.grpc.course.GetCourseTagsRequest,
+      com.example.grpc.course.GetCourseTagsResponse> getGetCourseTagsMethod() {
+    io.grpc.MethodDescriptor<com.example.grpc.course.GetCourseTagsRequest, com.example.grpc.course.GetCourseTagsResponse> getGetCourseTagsMethod;
+    if ((getGetCourseTagsMethod = CourseServiceGrpc.getGetCourseTagsMethod) == null) {
+      synchronized (CourseServiceGrpc.class) {
+        if ((getGetCourseTagsMethod = CourseServiceGrpc.getGetCourseTagsMethod) == null) {
+          CourseServiceGrpc.getGetCourseTagsMethod = getGetCourseTagsMethod =
+              io.grpc.MethodDescriptor.<com.example.grpc.course.GetCourseTagsRequest, com.example.grpc.course.GetCourseTagsResponse>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "getCourseTags"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  com.example.grpc.course.GetCourseTagsRequest.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  com.example.grpc.course.GetCourseTagsResponse.getDefaultInstance()))
+              .setSchemaDescriptor(new CourseServiceMethodDescriptorSupplier("getCourseTags"))
+              .build();
+        }
+      }
+    }
+    return getGetCourseTagsMethod;
+  }
+
+  private static volatile io.grpc.MethodDescriptor<com.google.protobuf.Empty,
+      com.example.grpc.course.GetAllCourseTagsResponse> getGetAllCourseTagsMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "getAllCourseTags",
+      requestType = com.google.protobuf.Empty.class,
+      responseType = com.example.grpc.course.GetAllCourseTagsResponse.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<com.google.protobuf.Empty,
+      com.example.grpc.course.GetAllCourseTagsResponse> getGetAllCourseTagsMethod() {
+    io.grpc.MethodDescriptor<com.google.protobuf.Empty, com.example.grpc.course.GetAllCourseTagsResponse> getGetAllCourseTagsMethod;
+    if ((getGetAllCourseTagsMethod = CourseServiceGrpc.getGetAllCourseTagsMethod) == null) {
+      synchronized (CourseServiceGrpc.class) {
+        if ((getGetAllCourseTagsMethod = CourseServiceGrpc.getGetAllCourseTagsMethod) == null) {
+          CourseServiceGrpc.getGetAllCourseTagsMethod = getGetAllCourseTagsMethod =
+              io.grpc.MethodDescriptor.<com.google.protobuf.Empty, com.example.grpc.course.GetAllCourseTagsResponse>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "getAllCourseTags"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  com.google.protobuf.Empty.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  com.example.grpc.course.GetAllCourseTagsResponse.getDefaultInstance()))
+              .setSchemaDescriptor(new CourseServiceMethodDescriptorSupplier("getAllCourseTags"))
+              .build();
+        }
+      }
+    }
+    return getGetAllCourseTagsMethod;
+  }
+
   /**
    * Creates a new async stub that supports all call types for the service
    */
@@ -404,6 +466,20 @@ public final class CourseServiceGrpc {
         io.grpc.stub.StreamObserver<com.example.grpc.course.IsInstructorResponse> responseObserver) {
       io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getIsInstructorMethod(), responseObserver);
     }
+
+    /**
+     */
+    default void getCourseTags(com.example.grpc.course.GetCourseTagsRequest request,
+        io.grpc.stub.StreamObserver<com.example.grpc.course.GetCourseTagsResponse> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getGetCourseTagsMethod(), responseObserver);
+    }
+
+    /**
+     */
+    default void getAllCourseTags(com.google.protobuf.Empty request,
+        io.grpc.stub.StreamObserver<com.example.grpc.course.GetAllCourseTagsResponse> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getGetAllCourseTagsMethod(), responseObserver);
+    }
   }
 
   /**
@@ -504,6 +580,22 @@ public final class CourseServiceGrpc {
       io.grpc.stub.ClientCalls.asyncUnaryCall(
           getChannel().newCall(getIsInstructorMethod(), getCallOptions()), request, responseObserver);
     }
+
+    /**
+     */
+    public void getCourseTags(com.example.grpc.course.GetCourseTagsRequest request,
+        io.grpc.stub.StreamObserver<com.example.grpc.course.GetCourseTagsResponse> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getGetCourseTagsMethod(), getCallOptions()), request, responseObserver);
+    }
+
+    /**
+     */
+    public void getAllCourseTags(com.google.protobuf.Empty request,
+        io.grpc.stub.StreamObserver<com.example.grpc.course.GetAllCourseTagsResponse> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getGetAllCourseTagsMethod(), getCallOptions()), request, responseObserver);
+    }
   }
 
   /**
@@ -583,6 +675,20 @@ public final class CourseServiceGrpc {
     public com.example.grpc.course.IsInstructorResponse isInstructor(com.example.grpc.course.IsInstructorRequest request) {
       return io.grpc.stub.ClientCalls.blockingUnaryCall(
           getChannel(), getIsInstructorMethod(), getCallOptions(), request);
+    }
+
+    /**
+     */
+    public com.example.grpc.course.GetCourseTagsResponse getCourseTags(com.example.grpc.course.GetCourseTagsRequest request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getGetCourseTagsMethod(), getCallOptions(), request);
+    }
+
+    /**
+     */
+    public com.example.grpc.course.GetAllCourseTagsResponse getAllCourseTags(com.google.protobuf.Empty request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getGetAllCourseTagsMethod(), getCallOptions(), request);
     }
   }
 
@@ -673,6 +779,22 @@ public final class CourseServiceGrpc {
       return io.grpc.stub.ClientCalls.futureUnaryCall(
           getChannel().newCall(getIsInstructorMethod(), getCallOptions()), request);
     }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<com.example.grpc.course.GetCourseTagsResponse> getCourseTags(
+        com.example.grpc.course.GetCourseTagsRequest request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getGetCourseTagsMethod(), getCallOptions()), request);
+    }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<com.example.grpc.course.GetAllCourseTagsResponse> getAllCourseTags(
+        com.google.protobuf.Empty request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getGetAllCourseTagsMethod(), getCallOptions()), request);
+    }
   }
 
   private static final int METHODID_GET_COURSE = 0;
@@ -684,6 +806,8 @@ public final class CourseServiceGrpc {
   private static final int METHODID_CHECK_HAS_PURCHASED = 6;
   private static final int METHODID_UPDATE_COURSE_RATING = 7;
   private static final int METHODID_IS_INSTRUCTOR = 8;
+  private static final int METHODID_GET_COURSE_TAGS = 9;
+  private static final int METHODID_GET_ALL_COURSE_TAGS = 10;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -737,6 +861,14 @@ public final class CourseServiceGrpc {
         case METHODID_IS_INSTRUCTOR:
           serviceImpl.isInstructor((com.example.grpc.course.IsInstructorRequest) request,
               (io.grpc.stub.StreamObserver<com.example.grpc.course.IsInstructorResponse>) responseObserver);
+          break;
+        case METHODID_GET_COURSE_TAGS:
+          serviceImpl.getCourseTags((com.example.grpc.course.GetCourseTagsRequest) request,
+              (io.grpc.stub.StreamObserver<com.example.grpc.course.GetCourseTagsResponse>) responseObserver);
+          break;
+        case METHODID_GET_ALL_COURSE_TAGS:
+          serviceImpl.getAllCourseTags((com.google.protobuf.Empty) request,
+              (io.grpc.stub.StreamObserver<com.example.grpc.course.GetAllCourseTagsResponse>) responseObserver);
           break;
         default:
           throw new AssertionError();
@@ -819,6 +951,20 @@ public final class CourseServiceGrpc {
               com.example.grpc.course.IsInstructorRequest,
               com.example.grpc.course.IsInstructorResponse>(
                 service, METHODID_IS_INSTRUCTOR)))
+        .addMethod(
+          getGetCourseTagsMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              com.example.grpc.course.GetCourseTagsRequest,
+              com.example.grpc.course.GetCourseTagsResponse>(
+                service, METHODID_GET_COURSE_TAGS)))
+        .addMethod(
+          getGetAllCourseTagsMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              com.google.protobuf.Empty,
+              com.example.grpc.course.GetAllCourseTagsResponse>(
+                service, METHODID_GET_ALL_COURSE_TAGS)))
         .build();
   }
 
@@ -876,6 +1022,8 @@ public final class CourseServiceGrpc {
               .addMethod(getCheckHasPurchasedMethod())
               .addMethod(getUpdateCourseRatingMethod())
               .addMethod(getIsInstructorMethod())
+              .addMethod(getGetCourseTagsMethod())
+              .addMethod(getGetAllCourseTagsMethod())
               .build();
         }
       }

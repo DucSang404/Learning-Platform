@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import instructorAvatar from '@/assets/images/course.jpg'
 import courseService from '@/services/course/course-user.service'
 import useDebounce from '@/hooks/useDebounce.hook'
+import eventTracker from '@/services/personalize/eventTracker'
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState(1)
@@ -140,7 +141,17 @@ const Index = () => {
           <div className='flex flex-col gap-4 mb-8'>
             {loading
               ? [...Array(10)].map((_, idx) => <CourseCardListSkeleton key={idx} />)
-              : mappedCourses.map((course) => <CourseCard key={course.id} {...course} />)}
+              : mappedCourses.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    {...course}
+                    onViewCourse={(courseId) =>
+                      eventTracker.trackingEvent('VIEW_COURSE', courseId).catch(() => {
+                        // ignore tracking errors
+                      })
+                    }
+                  />
+                ))}
           </div>
 
           <div className='flex items-center justify-center gap-2'>

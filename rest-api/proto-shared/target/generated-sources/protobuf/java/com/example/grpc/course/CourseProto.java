@@ -105,6 +105,26 @@ public final class CourseProto {
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_IsInstructorResponse_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_GetCourseTagsRequest_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_GetCourseTagsRequest_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_GetCourseTagsResponse_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_GetCourseTagsResponse_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_CourseSummary_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_CourseSummary_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_GetAllCourseTagsResponse_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_GetAllCourseTagsResponse_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -147,8 +167,13 @@ public final class CourseProto {
       "teCourseRatingResponse\022\020\n\010isSucces\030\001 \001(\010" +
       "\"7\n\023IsInstructorRequest\022\016\n\006userId\030\001 \001(\t\022" +
       "\020\n\010courseId\030\002 \001(\t\",\n\024IsInstructorRespons" +
-      "e\022\024\n\014isInstructor\030\001 \001(\010B(\n\027com.example.g" +
-      "rpc.courseB\013CourseProtoP\001b\006proto3"
+      "e\022\024\n\014isInstructor\030\001 \001(\010\"(\n\024GetCourseTags" +
+      "Request\022\020\n\010courseId\030\001 \001(\t\"%\n\025GetCourseTa" +
+      "gsResponse\022\014\n\004tags\030\001 \003(\t\"/\n\rCourseSummar" +
+      "y\022\020\n\010courseId\030\001 \001(\t\022\014\n\004tags\030\002 \003(\t\";\n\030Get" +
+      "AllCourseTagsResponse\022\037\n\007courses\030\001 \003(\0132\016" +
+      ".CourseSummaryB(\n\027com.example.grpc.cours" +
+      "eB\013CourseProtoP\001b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -263,6 +288,30 @@ public final class CourseProto {
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_IsInstructorResponse_descriptor,
         new java.lang.String[] { "IsInstructor", });
+    internal_static_GetCourseTagsRequest_descriptor =
+      getDescriptor().getMessageTypes().get(18);
+    internal_static_GetCourseTagsRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_GetCourseTagsRequest_descriptor,
+        new java.lang.String[] { "CourseId", });
+    internal_static_GetCourseTagsResponse_descriptor =
+      getDescriptor().getMessageTypes().get(19);
+    internal_static_GetCourseTagsResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_GetCourseTagsResponse_descriptor,
+        new java.lang.String[] { "Tags", });
+    internal_static_CourseSummary_descriptor =
+      getDescriptor().getMessageTypes().get(20);
+    internal_static_CourseSummary_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_CourseSummary_descriptor,
+        new java.lang.String[] { "CourseId", "Tags", });
+    internal_static_GetAllCourseTagsResponse_descriptor =
+      getDescriptor().getMessageTypes().get(21);
+    internal_static_GetAllCourseTagsResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_GetAllCourseTagsResponse_descriptor,
+        new java.lang.String[] { "Courses", });
     com.example.grpc.user.UserProto.getDescriptor();
   }
 

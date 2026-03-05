@@ -15,6 +15,7 @@ import com.freeclassroom.userservice.exception.ErrorCode;
 import com.freeclassroom.userservice.repository.entity.UserRepository;
 import com.freeclassroom.userservice.repository.httpclient.oauth2.GoogleOutboundAuthenticateClient;
 import com.freeclassroom.userservice.repository.httpclient.oauth2.GoogleOutboundUserInfoClient;
+import com.freeclassroom.userservice.service.event.EventService;
 import com.freeclassroom.userservice.service.token.RefreshTokenService;
 import com.freeclassroom.userservice.service.token.TokenBlacklistService;
 import com.freeclassroom.userservice.service.user.UserService;
@@ -52,6 +53,7 @@ public class AuthenticationService implements IAuthenticationService {
     GoogleOutboundAuthenticateClient googleAuthClient;
 
     UserService userService;
+    EventService eventService;
 
     @NonFinal
     @Value("${spring.jwt.signerKey}")
@@ -110,7 +112,7 @@ public class AuthenticationService implements IAuthenticationService {
 
             if (identity != null && "GUEST".equals(identity.getType())) {
                 try {
-                    userService.mergeGuestToUser(identity.getId(), account.getId());
+                    eventService.mergeGuestEventsToUser(identity.getId(), account.getId());
                 } catch (Exception e) {
                     log.warn("Failed to merge guest features into user", e);
                 }

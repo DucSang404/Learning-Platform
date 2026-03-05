@@ -72,11 +72,11 @@ const CourseList = ({ title, fetcher }: CourseListProps) => {
           <CourseCard
             key={course.id}
             course={course}
-            // onViewCourse={(courseId) =>
-            //   eventTracker.trackingEvent('VIEW_COURSE', courseId).catch(() => {
-            //     // ignore tracking errors
-            //   })
-            // }
+            onViewCourse={(courseId) =>
+              eventTracker.trackingEvent('VIEW_COURSE', courseId).catch(() => {
+                // ignore tracking errors
+              })
+            }
           />
         ))}
       </div>

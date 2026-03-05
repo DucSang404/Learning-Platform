@@ -4,6 +4,8 @@ import com.example.grpc.course.GetChartDataRequest;
 import com.example.grpc.course.GetChartDataResponse;
 import com.example.grpc.course.GetCourseAdminDataResponse;
 import com.example.grpc.course.GetCourseAndStudentResponse;
+import com.example.grpc.course.GetCourseTagsRequest;
+import com.example.grpc.course.GetCourseTagsResponse;
 import com.example.grpc.user.*;
 import com.google.protobuf.Empty;
 import net.devh.boot.grpc.client.inject.GrpcClient;
@@ -34,6 +36,13 @@ public class CourseGrpcClient {
                 .build();
 
         return courseStub.getChartData(request);
+    }
+
+    public GetCourseTagsResponse getCourseTags(String courseId) {
+        GetCourseTagsRequest request = GetCourseTagsRequest.newBuilder()
+                .setCourseId(courseId == null ? "" : courseId)
+                .build();
+        return courseStub.getCourseTags(request);
     }
 
 }

@@ -30,6 +30,7 @@ import com.freeclassroom.userservice.repository.entity.CertificateRepository;
 import com.freeclassroom.userservice.repository.entity.UserRepository;
 import com.freeclassroom.userservice.repository.redis.OTPForgetPasswordRepository;
 import com.freeclassroom.userservice.repository.redis.PendingUserRepository;
+import com.freeclassroom.userservice.service.event.EventService;
 import com.freeclassroom.userservice.service.file.UploadFileService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +54,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_GUEST;
 import static com.freeclassroom.userservice.enums.RedisStreamEnum.EVENT_USER;
 
 @Service
@@ -64,6 +64,7 @@ public class UserService implements IUserService {
     OTPForgetPasswordRepository otpForgetPasswordRepo;
     UserMapper userMapper;
     UploadFileService uploadFileService;
+    EventService eventService;
 
     CourseGrpcClient courseGrpcClient;
     BlogGrpcClient blogGrpcClient;
@@ -71,7 +72,6 @@ public class UserService implements IUserService {
     // template rabbitmq
     RabbitTemplate rabbitTemplate;
     RabbitMQConfig rabbitMQConfig;
-    StringRedisTemplate redis;
 
     RedisOperations<String, OTPForgetPassword> redisOps;
 
@@ -88,15 +88,6 @@ public class UserService implements IUserService {
 
     private final UserRepository userRepository;
     private final CertificateRepository certificateRepository;
-
-    private String normalizeGuestId(String rawGuestId) {
-        if (rawGuestId == null) return null;
-        String trimmed = rawGuestId.trim();
-        if (trimmed.startsWith("guest-")) {
-            return trimmed.substring("guest-".length());
-        }
-        return trimmed;
-    }
 
     public ApiResponse<UserResponse> registerUser(CreationUserRequest request) {
         // check user exits
@@ -349,60 +340,7 @@ public class UserService implements IUserService {
                     .build();
         }
 
-        // redis stream logic to track event
-        boolean isUser = "USER".equals(identity.getType());
-        String normalizedId = isUser ? identity.getId() : normalizeGuestId(identity.getId());
-        String stream = isUser ? EVENT_USER.getValue() : EVENT_GUEST.getValue();
-
-        // if user save database ()
-
-        // merge when guest login to user ()
-
-        if (trackingEvent != null && trackingEvent.getEventName() != null) {
-            String event = trackingEvent.getEventName();
-            if ("VIEW_COURSE".equals(event) && trackingEvent.getPayload() != null) {
-                String courseId = trackingEvent.getPayload().get("courseId");
-                if (courseId != null && !courseId.isBlank() && normalizedId != null && !normalizedId.isBlank()) {
-                    String featuresKey = isUser
-                            ? ("user:" + normalizedId + ":features")
-                            : ("guest:" + normalizedId + ":features");
-
-                    redis.opsForHash().increment(featuresKey, "view_course_" + courseId, 1d);
-
-                    if (!isUser) {
-                        redis.expire(featuresKey, Duration.ofDays(30));
-                    }
-                }
-            }
-        }
-
-        String payloadJson = "";
-        if (trackingEvent != null && trackingEvent.getPayload() != null && !trackingEvent.getPayload().isEmpty()) {
-            try {
-                payloadJson = new ObjectMapper().writeValueAsString(trackingEvent.getPayload());
-            } catch (JsonProcessingException ignored) {
-                payloadJson = "";
-            }
-        }
-
-        String eventName = trackingEvent != null && trackingEvent.getEventName() != null
-                ? trackingEvent.getEventName()
-                : "";
-
-        String streamKey = stream;
-
-        RecordId recordId = redis.opsForStream().add(
-            streamKey,
-                Map.of(
-                "userId", normalizedId == null ? "" : normalizedId,
-                        "eventName", eventName,
-                        "payload", payloadJson,
-                        "createdAt", String.valueOf(System.currentTimeMillis())
-                )
-        );
-
-        // Limit 10000 record lastest
-        redis.opsForStream().trim(streamKey, 10_000);
+        RecordId recordId = eventService.saveEventToRedis(identity, trackingEvent);
 
         if (recordId == null) {
             return ApiResponse.<Void>builder()
@@ -415,54 +353,6 @@ public class UserService implements IUserService {
                 .message("Personal event tracked successfully")
                 .build();
     }
-
-    public void mergeGuestToUser(String guestId, String userId) {
-        if (guestId == null || guestId.isBlank() || userId == null || userId.isBlank()) {
-            return;
-        }
-
-        String normalizedGuestId = normalizeGuestId(guestId);
-        if (normalizedGuestId == null || normalizedGuestId.isBlank()) {
-            return;
-        }
-
-        String guestFeaturesKey = "guest:" + normalizedGuestId + ":features";
-        String legacyGuestFeaturesKey = "guest:guest-" + normalizedGuestId + ":features";
-        String userFeaturesKey = "user:" + userId + ":features";
-
-        DataType keyType = redis.type(guestFeaturesKey);
-        if (keyType == null || DataType.NONE.equals(keyType) || !DataType.HASH.equals(keyType)) {
-            DataType legacyType = redis.type(legacyGuestFeaturesKey);
-            if (legacyType == null || DataType.NONE.equals(legacyType) || !DataType.HASH.equals(legacyType)) {
-                return;
-            }
-            guestFeaturesKey = legacyGuestFeaturesKey;
-        }
-
-        Map<Object, Object> guestFeatures = redis.opsForHash().entries(guestFeaturesKey);
-        if (guestFeatures == null || guestFeatures.isEmpty()) {
-            return;
-        }
-
-        guestFeatures.forEach((feature, score) -> {
-            String field = feature == null ? "" : feature.toString();
-            if (field.isBlank() || score == null) return;
-
-            double delta;
-            try {
-                delta = Double.parseDouble(score.toString());
-            } catch (NumberFormatException e) {
-                return;
-            }
-
-            if (delta == 0d) return;
-
-            redis.opsForHash().increment(userFeaturesKey, field, delta);
-        });
-
-        redis.delete(guestFeaturesKey);
-    }
-
 
     public ApiResponse<UserResponse> verifyForgotPassword(String code, String newPassword) {
         // get token in redis
