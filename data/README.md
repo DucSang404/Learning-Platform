@@ -64,11 +64,20 @@ c. **Tags, Outcomes, Chapters & Lessons**: Extracts tags and generates related c
        *   `data/normalized/lessons.csv`
        *   Updates `courses.csv` (removes tags column, adds final IDs)
 
+d. **Blogs**: Generates blog entries from courses.
+   *   **Script:** `scripts/normalize/normalize_blogs.py`
+   *   **Output:** `data/normalized/blogs.csv`
+
+e. **Feedbacks**: Reuses generated course users and creates random course reviews and ratings.
+   *   **Script:** `scripts/normalize/normalize_feedbacks.py`
+   *   **Output:** `data/normalized/feedbacks.csv` & appends 10 review users to `users.csv`
+
 ### 4. Database Config & Import
-Imports the normalized CSV files into the MySQL databases (`user_service` and `course_service`) and MongoDB (`blog-service`).
+Imports the normalized CSV files into the MySQL databases (`user_service` and `course_service`) and MongoDB (`blog-service`, `notification-service`).
 *   **Scripts:** 
     *   `scripts/import-data/import_to_mysql.py`
     *   `scripts/import-data/import_blogs.py`
+    *   `scripts/import-data/import_feedbacks.py`
 *   **Requirements:** 
     *   MySQL running on localhost:3306 (or configured via `.env`).
     *   MongoDB running (or configured via `.env`).
@@ -110,10 +119,12 @@ python scripts/normalize/normalize_categories.py
 python scripts/normalize/normalize_users.py
 python scripts/normalize/normalize_tags.py
 python scripts/normalize/normalize_blogs.py
+python scripts/normalize/normalize_feedbacks.py
 
 # 3. Import to MySQL & MongoDB
 python scripts/import-data/import_to_mysql.py
 python scripts/import-data/import_blogs.py
+python scripts/import-data/import_feedbacks.py
 ```
 
 ### One-Liner Command
@@ -123,6 +134,8 @@ python scripts/normalize/normalize_categories.py && \
 python scripts/normalize/normalize_users.py && \
 python scripts/normalize/normalize_tags.py && \
 python scripts/normalize/normalize_blogs.py && \
+python scripts/normalize/normalize_feedbacks.py && \
 python scripts/import-data/import_to_mysql.py && \
-python scripts/import-data/import_blogs.py
+python scripts/import-data/import_blogs.py && \
+python scripts/import-data/import_feedbacks.py
 ```
