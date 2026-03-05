@@ -64,10 +64,15 @@ c. **Tags, Outcomes, Chapters & Lessons**: Extracts tags and generates related c
        *   `data/normalized/lessons.csv`
        *   Updates `courses.csv` (removes tags column, adds final IDs)
 
-### 4. Import to Database
-Imports the normalized CSV files into the MySQL databases (`user_service` and `course_service`).
-*   **Script:** `scripts/import-data/import_to_mysql.py`
-*   **Requirements:** MySQL running on localhost:3306 (or configured via `.env`).
+### 4. Database Config & Import
+Imports the normalized CSV files into the MySQL databases (`user_service` and `course_service`) and MongoDB (`blog-service`).
+*   **Scripts:** 
+    *   `scripts/import-data/import_to_mysql.py`
+    *   `scripts/import-data/import_blogs.py`
+*   **Requirements:** 
+    *   MySQL running on localhost:3306 (or configured via `.env`).
+    *   MongoDB running (or configured via `.env`).
+    *   `pip install pymongo` for the MongoDB import script.
 
 ## Usage
 
@@ -76,15 +81,21 @@ Imports the normalized CSV files into the MySQL databases (`user_service` and `c
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install pymongo
 ```
 
 ### 2. Configure Database
-Create a `.env` file in the `data/` directory:
+Create a `.env` file in the `data/` directory based on `.env.example`:
 ```env
+# MySQL Config
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
 DB_PORT=3306
+
+# MongoDB Config
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB_NAME=blog-service
 ```
 
 ### 3. Run Full Pipeline
@@ -98,9 +109,11 @@ python scripts/clean/clean_online_courses.py
 python scripts/normalize/normalize_categories.py
 python scripts/normalize/normalize_users.py
 python scripts/normalize/normalize_tags.py
+python scripts/normalize/normalize_blogs.py
 
-# 3. Import to MySQL
+# 3. Import to MySQL & MongoDB
 python scripts/import-data/import_to_mysql.py
+python scripts/import-data/import_blogs.py
 ```
 
 ### One-Liner Command
@@ -109,5 +122,7 @@ python scripts/clean/clean_online_courses.py && \
 python scripts/normalize/normalize_categories.py && \
 python scripts/normalize/normalize_users.py && \
 python scripts/normalize/normalize_tags.py && \
-python scripts/import-data/import_to_mysql.py
+python scripts/normalize/normalize_blogs.py && \
+python scripts/import-data/import_to_mysql.py && \
+python scripts/import-data/import_blogs.py
 ```
