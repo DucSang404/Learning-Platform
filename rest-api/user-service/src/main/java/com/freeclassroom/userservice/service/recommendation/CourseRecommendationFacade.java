@@ -1,5 +1,6 @@
 package com.freeclassroom.userservice.service.recommendation;
 
+import com.freeclassroom.userservice.dto.request.auth.Identity;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.course.CourseUserResponse;
 import com.freeclassroom.userservice.dto.response.course.InstructorResponse;
@@ -30,12 +31,12 @@ public class CourseRecommendationFacade {
     CourseRecommendationService recommendationService;
     CourseGrpcClient courseGrpcClient;
 
-    public ApiResponse<List<CourseUserResponse>> getRecommendedCoursesAsCourseList(String userId,
-                                                                                  String courseId,
-                                                                                  String tag,
-                                                                                  Integer page,
-                                                                                  Integer size) {
-        ApiResponse<RecommendedCoursePageResponse> rec = recommendationService.getTopCoursesForUser(userId, courseId, tag, page, size);
+    public ApiResponse<List<CourseUserResponse>> getRecommendedCoursesAsCourseList(Identity identity,
+                                                                                   String courseId,
+                                                                                   String tag,
+                                                                                   Integer page,
+                                                                                   Integer size) {
+        ApiResponse<RecommendedCoursePageResponse> rec = recommendationService.getTopCoursesForUser(identity, courseId, tag, page, size);
         RecommendedCoursePageResponse result = rec.getResult();
         List<RecommendedCourseItem> items = result == null ? List.of() : result.getItems();
 

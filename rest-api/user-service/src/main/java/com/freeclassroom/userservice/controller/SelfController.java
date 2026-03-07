@@ -26,8 +26,6 @@ import java.util.Set;
 public class SelfController {
     IExpertiseService expertiseService;
     IUserService userService;
-    CourseRecommendationService courseRecommendationService;
-    CourseRecommendationFacade courseRecommendationFacade;
 
     @GetMapping
     public ApiResponse<MyProfileResponse> getMyProfile() {
@@ -51,16 +49,5 @@ public class SelfController {
     public ApiResponse<CreationResponse> addExpertiseToCurrentUser(@PathVariable String expertiseId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return expertiseService.addExpertiseForUser(username, expertiseId);
-    }
-
-    @GetMapping("/recommendations/courses")
-    public ApiResponse<List<CourseUserResponse>> getRecommendedCourses(
-            @RequestParam(required = false) String courseId,
-            @RequestParam(required = false) String tag,
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
-        return courseRecommendationFacade.getRecommendedCoursesAsCourseList(userId, courseId, tag, page, size);
     }
 }

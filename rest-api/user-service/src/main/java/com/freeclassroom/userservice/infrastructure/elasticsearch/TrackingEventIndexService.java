@@ -21,59 +21,79 @@ public class TrackingEventIndexService {
     public void ensureIndexExists() {
         String index = indexName();
 
-        boolean exists;
-        try {
-            exists = es.head()
-                    .uri("/{index}", index)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .getStatusCode()
-                    .is2xxSuccessful();
-        } catch (Exception e) {
-            exists = false;
-        }
+        RuntimeException last = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                boolean exists = es.head()
+                        .uri("/{index}", index)
+                        .retrieve()
+                        .toBodilessEntity()
+                        .getStatusCode()
+                        .is2xxSuccessful();
 
-        if (exists) return;
+                if (exists) return;
 
-        Map<String, Object> body = Map.of(
-                "mappings", Map.of(
-                        "dynamic", "false",
-                        "properties", Map.of(
-                                "subjectType", Map.of("type", "keyword"),
-                                "subjectId", Map.of("type", "keyword"),
-                                "updatedAt", Map.of("type", "date", "format", "epoch_millis"),
-                                "courseScore", Map.of(
-                                        "type", "nested",
-                                        "properties", Map.of(
-                                                "courseId", Map.of("type", "keyword"),
-                                                "score", Map.of("type", "double")
-                                        )
-                                ),
-                                "tagScore", Map.of(
-                                        "type", "nested",
-                                        "properties", Map.of(
-                                                "tag", Map.of("type", "keyword"),
-                                                "score", Map.of("type", "double")
-                                        )
-                                ),
-                                "lastAction", Map.of(
-                                        "properties", Map.of(
-                                                "lastSeenAtMs", Map.of("type", "date", "format", "epoch_millis"),
-                                                "lastEventName", Map.of("type", "keyword"),
-                                                "lastCourseId", Map.of("type", "keyword"),
-                                                "lastTag", Map.of("type", "keyword")
+                Map<String, Object> body = Map.of(
+                        "mappings", Map.of(
+                                "dynamic", "false",
+                                "properties", Map.of(
+                                        "subjectType", Map.of("type", "keyword"),
+                                        "subjectId", Map.of("type", "keyword"),
+                                        "updatedAt", Map.of("type", "date", "format", "epoch_millis"),
+                                        "courseScore", Map.of(
+                                                "type", "nested",
+                                                "properties", Map.of(
+                                                        "courseId", Map.of("type", "keyword"),
+                                                        "score", Map.of("type", "double")
+                                                )
+                                        ),
+                                        "tagScore", Map.of(
+                                                "type", "nested",
+                                                "properties", Map.of(
+                                                        "tag", Map.of("type", "keyword"),
+                                                        "score", Map.of("type", "double")
+                                                )
+                                        ),
+                                        "lastAction", Map.of(
+                                                "properties", Map.of(
+                                                        "lastSeenAtMs", Map.of("type", "date", "format", "epoch_millis"),
+                                                        "lastEventName", Map.of("type", "keyword"),
+                                                        "lastCourseId", Map.of("type", "keyword"),
+                                                        "lastTag", Map.of("type", "keyword")
+                                                )
                                         )
                                 )
                         )
-                )
-        );
+                );
 
-        es.put()
-                .uri("/{index}", index)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
+                es.put()
+                        .uri("/{index}", index)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .toBodilessEntity();
+
+                return; // created successfully
+            } catch (RuntimeException e) {
+                last = e;
+                // backoff: 200ms, 400ms, 800ms
+                sleepSilently(200L * (1L << (attempt - 1)));
+            } catch (Exception e) {
+                last = new RuntimeException(e);
+                sleepSilently(200L * (1L << (attempt - 1)));
+            }
+        }
+
+        // stop after 3 attempts
+        throw last != null ? last : new RuntimeException("Failed to ensure Elasticsearch index exists");
+    }
+
+    private static void sleepSilently(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public String documentId(String subjectType, String subjectId) {

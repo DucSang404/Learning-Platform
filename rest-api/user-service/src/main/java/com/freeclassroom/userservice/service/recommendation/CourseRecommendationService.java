@@ -1,5 +1,6 @@
 package com.freeclassroom.userservice.service.recommendation;
 
+import com.freeclassroom.userservice.dto.request.auth.Identity;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.recommendation.RecommendedCourseItem;
 import com.freeclassroom.userservice.dto.response.recommendation.RecommendedCoursePageResponse;
@@ -42,16 +43,29 @@ public class CourseRecommendationService {
     // Ensure a minimum portion of candidates come from tagScore-driven retrieval.
     private static final int MIN_TAG_CANDIDATES = 120;
 
-    public ApiResponse<RecommendedCoursePageResponse> getTopCoursesForUser(String userId,
-                                                                          String courseId,
-                                                                          String tag,
-                                                                          Integer page,
-                                                                          Integer size) {
+    private boolean isUser(Identity identity) {
+        return identity != null && "USER".equals(identity.getType()) && identity.getId() != null && !identity.getId().isBlank();
+    }
+
+    private boolean isGuest(Identity identity) {
+        return identity != null && "GUEST".equals(identity.getType()) && identity.getId() != null && !identity.getId().isBlank();
+    }
+
+    public ApiResponse<RecommendedCoursePageResponse> getTopCoursesForUser(Identity identity,
+                                                                           String courseId,
+                                                                           String tag,
+                                                                           Integer page,
+                                                                           Integer size) {
         int pageSize = normalizeSize(size);
         int pageNumber = normalizePage(page);
         int offset = Math.multiplyExact(pageNumber, pageSize);
 
-        Map<String, Object> source = trackingEventIndexService.getSignalsSource("USER", userId);
+        String userId = identity.getId();
+        boolean isUser = isUser(identity);
+        boolean isGuest = isGuest(identity);
+        String subjectType = isUser ? "USER" : (isGuest ? "GUEST" : null);
+
+        Map<String, Object> source = trackingEventIndexService.getSignalsSource(subjectType, userId);
 
         // IMPORTANT:
         // Build a stable ranked list independent from requested page size.
