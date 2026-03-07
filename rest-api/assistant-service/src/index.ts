@@ -30,4 +30,4 @@ RabbitMQService.getInstance().then(async (rabbitClient) => {
     Logger.error(`Failed to connect to RabbitMQ: ${error}`);
 });
 
-app.listen(PORT, () => Logger.info(`Learnova:assistant_service running http://localhost:${PORT}`));
+app.listen(PORT, () => Logger.info(`Learnova:assistant_service running at http://localhost:${PORT}`));

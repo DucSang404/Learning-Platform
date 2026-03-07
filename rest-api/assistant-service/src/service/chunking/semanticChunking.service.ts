@@ -1,7 +1,7 @@
 
 import { DocumentLoader } from "~/service/chunking/documentLoader.service";
 import { SentenceProcessor } from "~/service/chunking/sentenceProcessor.service";
-import { EmbeddingService } from "~/service/chunking/embeddingService.service";
+import { EmbeddingE5Service } from "~/service/chunking/embeddingE5.service";
 import { SemanticAnalyzer } from "~/service/chunking/semanticAnalyzer.service";
 import { SemanticChunk } from "~/service/chunking/types";
 
@@ -29,13 +29,13 @@ export interface SemanticChunkingConfig {
 export class SemanticChunkingService {
     private documentLoader: DocumentLoader;
     private sentenceProcessor: SentenceProcessor;
-    private embeddingService: EmbeddingService;
+    private embeddingService: EmbeddingE5Service;
     private semanticAnalyzer: SemanticAnalyzer;
 
     constructor() {
         this.documentLoader = new DocumentLoader();
         this.sentenceProcessor = new SentenceProcessor();
-        this.embeddingService = new EmbeddingService();
+        this.embeddingService = new EmbeddingE5Service();
         this.semanticAnalyzer = new SemanticAnalyzer();
     }
 
