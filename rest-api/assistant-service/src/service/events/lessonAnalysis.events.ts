@@ -131,6 +131,8 @@ export class LessonAnalysisEvents {
         );
 
         // 1. Run semantic chunking on the text
+        // 2 - 95 / 3 - 95 for e5base
+        // 3 - 95 for openai
         const chunks = await this.chunkingService.processRawText(subtitles, {
             bufferSize: 3,
             percentileThreshold: 95,
