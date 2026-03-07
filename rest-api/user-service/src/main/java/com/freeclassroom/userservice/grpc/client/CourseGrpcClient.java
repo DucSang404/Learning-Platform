@@ -45,4 +45,19 @@ public class CourseGrpcClient {
         return courseStub.getCourseTags(request);
     }
 
+    public List<com.example.grpc.course.CourseResponse> getBulkCourses(List<String> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) return List.of();
+
+        com.example.grpc.course.GetCoursesRequest request = com.example.grpc.course.GetCoursesRequest.newBuilder()
+                .addAllCourseIds(courseIds)
+                .build();
+
+        com.example.grpc.course.GetCoursesResponse response = courseStub.getBulkCourses(request);
+        return response == null ? List.of() : response.getCoursesList();
+    }
+
+    // NOTE: user-service currently only uses getCourseTags + admin chart endpoints.
+    // Do NOT add getCourse/getBulkCourses here unless the proto-shared jar exposes the required message types
+    // for this module
+
 }

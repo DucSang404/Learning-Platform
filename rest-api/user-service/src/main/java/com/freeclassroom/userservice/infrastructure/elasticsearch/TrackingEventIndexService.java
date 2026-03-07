@@ -101,4 +101,28 @@ public class TrackingEventIndexService {
                 .retrieve()
                 .toBodilessEntity();
     }
+
+    /**
+     * Fetch raw signals document by subject.
+     * @return Elasticsearch _source map or null if not found.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getSignalsSource(String subjectType, String subjectId) {
+        try {
+            Map<String, Object> res = es.get()
+                    .uri("/{index}/_doc/{id}", indexName(), documentId(subjectType, subjectId))
+                    .retrieve()
+                    .body(Map.class);
+            if (res == null) return null;
+            Object found = res.get("found");
+            if (found instanceof Boolean b && !b) return null;
+            Object src = res.get("_source");
+            if (src instanceof Map<?, ?> m) {
+                return (Map<String, Object>) m;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }
