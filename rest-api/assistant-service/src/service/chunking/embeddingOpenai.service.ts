@@ -5,7 +5,7 @@ import { SentenceObject } from "./types";
 /**
  * Service class for generating and attaching embeddings to sentences.
  */
-export class EmbeddingService {
+export class EmbeddingOpenAIService {
     private embeddings: OpenAIEmbeddings;
 
     constructor() {
