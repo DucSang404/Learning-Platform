@@ -10,8 +10,8 @@ const HomePage = () => {
   return (
     <div className='home-page-container '>
       <Banner />
-      <CourseList title='Khóa học bán chạy nhất' fetcher={courseService.getBestSellerCourses} />
-      <CourseList title='Khóa học hot tháng này' fetcher={courseService.getTrendyCourseThisMonth} />
+      <CourseList title='Khóa học gợi ý' fetcher={courseService.getPersonalizationCourse} />
+      <CourseList title='Khóa học bán chạy' fetcher={courseService.getBestSellerCourses} />
       <TrendingCategories />
       <WhyChooseUsSection />
       <TestimonialsCarousel />

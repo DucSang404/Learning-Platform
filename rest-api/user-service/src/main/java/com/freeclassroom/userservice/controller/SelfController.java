@@ -4,7 +4,11 @@ import com.freeclassroom.userservice.dto.request.expertise.AddExpertiseRequest;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.common.CreationResponse;
 import com.freeclassroom.userservice.dto.response.user.MyProfileResponse;
+import com.freeclassroom.userservice.dto.response.recommendation.RecommendedCoursePageResponse;
+import com.freeclassroom.userservice.dto.response.course.CourseUserResponse;
 import com.freeclassroom.userservice.service.expertise.IExpertiseService;
+import com.freeclassroom.userservice.service.recommendation.CourseRecommendationService;
+import com.freeclassroom.userservice.service.recommendation.CourseRecommendationFacade;
 import com.freeclassroom.userservice.service.user.IUserService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +16,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Set;
 
 @RestController
