@@ -1,17 +1,21 @@
 package com.freeclassroom.userservice.controller;
 
+import com.freeclassroom.userservice.dto.request.auth.Identity;
 import com.freeclassroom.userservice.dto.request.certificates.CreateCertReq;
 import com.freeclassroom.userservice.dto.request.certificates.UpdateCertReq;
+import com.freeclassroom.userservice.dto.request.personal.TrackingEventRequest;
 import com.freeclassroom.userservice.dto.request.user.CreationUserRequest;
 import com.freeclassroom.userservice.dto.request.user.UpdateUserRequest;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.admin.DataAdminHome;
 import com.freeclassroom.userservice.dto.response.certificate.CertificateResponse;
+import com.freeclassroom.userservice.dto.response.course.CourseUserResponse;
 import com.freeclassroom.userservice.dto.response.user.GetUserResponse;
 import com.freeclassroom.userservice.dto.response.user.UserResponse;
-import com.freeclassroom.userservice.service.certificate.CertificateService;
 import com.freeclassroom.userservice.service.certificate.ICertificateService;
+import com.freeclassroom.userservice.service.recommendation.CourseRecommendationFacade;
 import com.freeclassroom.userservice.service.user.IUserService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -29,6 +33,8 @@ import java.util.UUID;
 public class UserController {
     IUserService userService;
     ICertificateService certificateService;
+    CourseRecommendationFacade courseRecommendationFacade;
+
     @GetMapping
     ApiResponse<UserResponse> checkStatus() {
         return ApiResponse.<UserResponse>builder()
@@ -97,4 +103,22 @@ public class UserController {
         return certificateService.deleteCertificate(id);
     }
 
+    @PostMapping("/track-event")
+    ApiResponse<Void> trackEvent(@RequestBody TrackingEventRequest trackingEvent,
+                                 HttpServletRequest request) {
+        Identity identity = (Identity) request.getAttribute("IDENTITY");
+        return userService.trackingEvent(identity, trackingEvent);
+    }
+
+    @GetMapping("/recommendations/courses")
+    public ApiResponse<List<CourseUserResponse>> getRecommendedCourses(
+            @RequestParam(required = false) String courseId,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            HttpServletRequest request
+    ) {
+        Identity identity = (Identity) request.getAttribute("IDENTITY");
+        return courseRecommendationFacade.getRecommendedCoursesAsCourseList(identity, courseId, tag, page, size);
+    }
 }
