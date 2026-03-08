@@ -5,6 +5,7 @@ import { CourseApprovalEvent } from '~/dto/event/course-approval-event.dto'
 import { QueueNameEnum } from '~/enums/rabbitQueue.enum'
 import { getUser } from '~/grpc/userClient'
 import { renderTemplate } from '~/utils/templateUtil'
+import Logger from '~/utils/logger'
 
 // Interface cho options gửi mail
 export interface SendEmailOptions {
@@ -39,10 +40,10 @@ class NodeMailService {
         html: options.html
       })
 
-      console.log('Email sent:', info.messageId)
+      Logger.info(`Email sent: ${info.messageId}`)
       return info
     } catch (error) {
-      console.error('Failed to send email:', error)
+      Logger.error(`Failed to send email: ${error}`)
       throw error
     }
   }
@@ -76,16 +77,19 @@ class NodeMailService {
       }
 
       case QueueNameEnum.ORDERCONFIRM: {
+        Logger.info(`[NodeMailService] Handling ORDERCONFIRM. Processing for: ${(notification as any).payload?.customer_email || (notification as any).email}. isVip: ${(notification as any).payload?.orderType === 'VIP'}`);
         // Order confirmation notification - payload should contain customer and items
         const orderNotification = notification as {
           email?: string | string[]
           to?: string | string[]
-          payload?: unknown
+          payload?: any
         }
 
-        subject = 'Xác nhận đơn hàng của bạn'
+        const isVipOrder = orderNotification.payload?.orderType === 'VIP'
+
+        subject = isVipOrder ? 'Cảm ơn bạn đã đăng ký VIP!' : 'Xác nhận đơn hàng của bạn'
         to = orderNotification.email || orderNotification.to || []
-        templateName = 'order-confirmation.html'
+        templateName = isVipOrder ? 'vip-confirmation.html' : 'order-confirmation.html'
         templateData = orderNotification.payload || orderNotification
         break
       }
@@ -97,7 +101,7 @@ class NodeMailService {
           const user = await getUser(event.instructorId)
           instructorEmail = user?.email || ''
         } catch (err) {
-          console.error('Lỗi lấy email instructor:', err)
+          Logger.error(`Lỗi lấy email instructor: ${err}`)
           return
         }
         to = instructorEmail
@@ -119,14 +123,13 @@ class NodeMailService {
             thumbnailUrl: event.thumbnailUrl
           }
         } else {
-          console.log('Không xác định action cho course approval:', event)
+          Logger.info(`Không xác định action cho course approval: ${JSON.stringify(event)}`)
           return
         }
         break
       }
-      // Thêm các loại khác nếu cần
       default:
-        console.log(`Chưa thể gửi mail to ${notification.email}: ${notification.type}`)
+        Logger.info(`Chưa thể gửi mail to ${notification.email}: ${notification.type}`)
         return
     }
 
@@ -141,6 +144,7 @@ class NodeMailService {
     }
 
     await this.send(mailPayload)
+    Logger.info(`Email sent: ${mailPayload.subject}`)
   }
 }
 

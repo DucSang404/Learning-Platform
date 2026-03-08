@@ -3,7 +3,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import formatPrice from '@/utils/common/formatPrice'
 import CustomButton from '@/components/common/Button'
-import { Send, ClipboardClock } from 'lucide-react'
+import { Send, ClipboardClock, Crown } from 'lucide-react'
 import OrderDetail from './order-detail'
 import CustomDialog from '@/components/common/Dialog'
 import { useState } from 'react'
@@ -19,33 +19,45 @@ const OrderHistoryItem = ({ item }: { item: HistoryOrder }) => {
     <Item className='hover:bg-gray-100 transition-colors duration-200 shadow-sm'>
       <ItemMedia className='w-56 flex-shrink-0 pr-6'>
         <div className='flex items-center'>
-          <div className='flex -space-x-3 items-center'>
-            {item.items.slice(0, 3).map((orderItem, idx) => (
-              <div key={orderItem.course_id} className='relative' style={{ zIndex: 10 + idx }}>
-                <Avatar className='w-12 h-12 ring-2 ring-white border border-white'>
-                  <AvatarImage src={orderItem.image} alt={orderItem.course_name} />
-                  <AvatarFallback>{orderItem.course_name?.charAt(0) ?? '?'}</AvatarFallback>
-                </Avatar>
-              </div>
-            ))}
+          {item.type === 'VIP_SUBSCRIPTION' ? (
+            <div className='flex items-center justify-center relative z-10'>
+              <Avatar className='w-12 h-12 ring-2 ring-yellow-400 border border-yellow-400 bg-yellow-50 text-yellow-500'>
+                <AvatarFallback className="bg-transparent">
+                  <Crown className="fill-yellow-500 w-6 h-6" />
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          ) : (
+            <div className='flex -space-x-3 items-center'>
+              {item.items.slice(0, 3).map((orderItem, idx) => (
+                <div key={orderItem.course_id} className='relative' style={{ zIndex: 10 + idx }}>
+                  <Avatar className='w-12 h-12 ring-2 ring-white border border-white'>
+                    <AvatarImage src={orderItem.image} alt={orderItem.course_name} />
+                    <AvatarFallback>{orderItem.course_name?.charAt(0) ?? '?'}</AvatarFallback>
+                  </Avatar>
+                </div>
+              ))}
 
-            {item.items.length > 3 && (
-              <div className='relative' style={{ zIndex: 1 }}>
-                <Avatar className='w-12 h-12 bg-muted text-muted-foreground border border-white'>
-                  <AvatarFallback>+{item.items.length - 3}</AvatarFallback>
-                </Avatar>
-              </div>
-            )}
-          </div>
+              {item.items.length > 3 && (
+                <div className='relative' style={{ zIndex: 1 }}>
+                  <Avatar className='w-12 h-12 bg-muted text-muted-foreground border border-white'>
+                    <AvatarFallback>+{item.items.length - 3}</AvatarFallback>
+                  </Avatar>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className='ml-4 min-w-0'>
             <p className='text-sm font-medium'>
               Mã số:{' '}
-              <span className='inline-block max-w-40 truncate align-middle' title={item.id}>
+              <span className='inline-block max-w-[140px] truncate align-middle' title={item.id}>
                 {item.id}
               </span>
             </p>
-            <p className='text-xs text-muted-foreground'>{item.items.length} khóa học</p>
+            <p className='text-xs text-muted-foreground'>
+              {item.type === 'VIP_SUBSCRIPTION' ? 'Gói cước Learnova VIP' : `${item.items.length} khóa học`}
+            </p>
           </div>
         </div>
       </ItemMedia>

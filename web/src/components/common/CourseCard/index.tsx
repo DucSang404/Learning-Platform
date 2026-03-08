@@ -138,18 +138,7 @@ const CourseCard = ({ course, className, onViewCourse }: CourseCardProps) => {
 
   return (
     <>
-      <Card
-        className={`p-0 gap-0 course-card group relative cursor-pointer ${className}`}
-        role='button'
-        tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            handleClick()
-          }
-        }}
-      >
+      <Card className={`p-0 gap-0 course-card group relative flex flex-col h-full ${className}`}>
         <CardHeader className='p-0'>
           <div className='relative'>
             <img
@@ -171,19 +160,19 @@ const CourseCard = ({ course, className, onViewCourse }: CourseCardProps) => {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className='p-4 pt-1'>
-          <CardTitle className='text-lg font-bold'>{course.title}</CardTitle>
+        <CardContent className='p-4 pt-1 flex flex-col flex-1'>
+          <CardTitle className='text-base font-bold line-clamp-2 min-h-[3rem] leading-snug'>{course?.title}</CardTitle>
           <CardDescription className='flex text-sm text-muted-foreground gap-2'>
-            <p className='line-through'>{formatPrice(course.originalPrice)}</p>
-            <p className='text-red-500 font-bold'>{formatPrice(course.finalPrice)}</p>
+            <p className='line-through'>{formatPrice(course?.originalPrice)}</p>
+            <p className='text-red-500 font-bold'>{formatPrice(course?.finalPrice)}</p>
           </CardDescription>
-          <CardDescription className='flex justify-between gap-2 mt-2'>
-            <div className='flex items-center gap-2'>
-              <Avatar>
-                <AvatarImage src={course.instructor.image} />
+          <CardDescription className='flex justify-between gap-2 mt-auto pt-3'>
+            <div className='flex items-center gap-2 min-w-0'>
+              <Avatar className='shrink-0'>
+                <AvatarImage src={course.instructor?.image} />
                 <AvatarFallback>CN</AvatarFallback>
               </Avatar>
-              <p>{course.instructor.name}</p>
+              <p className='truncate text-sm'>{course.instructor?.name}</p>
             </div>
             <Button
               className='rounded-3xl btn-detail bg-primary hover:bg-primary-hover hover:scale-105 transition-transform duration-300 ease-in-out'

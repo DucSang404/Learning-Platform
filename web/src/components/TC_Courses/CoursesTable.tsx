@@ -126,11 +126,13 @@ const CoursesTable: FC<CoursesTableProps> = ({ courses, statusFilter = '', onCha
                     alt={course.title}
                     className='w-20 h-14 sm:w-28 sm:h-20 rounded-lg object-cover shadow-sm'
                   />
-                  <div>
-                    <div className='font-semibold text-gray-700 dark:text-gray-100 text-base sm:text-lg'>
+                  <div className='max-w-[200px] sm:max-w-[300px]'>
+                    <div className='font-semibold text-gray-700 dark:text-gray-100 text-base sm:text-lg truncate' title={course.title}>
                       {course.title}
-                      <p className='text-sm text-gray-400 dark:text-gray-500 font-light'>{course?.shortDescription}</p>
                     </div>
+                    <p className='text-sm text-gray-400 dark:text-gray-500 font-light line-clamp-2' title={course?.shortDescription || undefined}>
+                      {course?.shortDescription}
+                    </p>
                     <div className='flex flex-wrap gap-2 mt-2'>
                       {(course.tagNames || course.tags || []).map((tag, idx) => (
                         <span

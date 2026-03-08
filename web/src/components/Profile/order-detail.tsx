@@ -4,7 +4,7 @@ import formatPrice from '@/utils/common/formatPrice'
 import { useEffect, useState } from 'react'
 import orderService from '@/services/sale/order.service'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { User } from 'lucide-react'
+import { User, Crown } from 'lucide-react'
 import OrderDetailSkeleton from './order-detail-skeleton'
 
 const OrderDetail = ({ orderId }: { orderId: string }) => {
@@ -81,21 +81,39 @@ const OrderDetail = ({ orderId }: { orderId: string }) => {
                 </div>
               </div>
             </div>
-            <div className='items order-items'>
-              {order?.items.map((item, index) => (
-                <div key={index} className='flex justify-between text-sm mb-2 py-4 rounded-md'>
-                  <div className='flex items-center gap-2 font-medium'>
-                    <img src={item.image} alt={item.title} className='w-8 h-8 object-cover rounded-md' />
-                    <span>
-                      <p>{item.title}</p>
-                      <p className='font-normal text-gray-800'>@{item.instructor_name}</p>
-                    </span>
-                  </div>
-                  <span>{formatPrice(item.price)}</span>
+            {order.type === 'VIP_SUBSCRIPTION' ? (
+              <div className='flex items-center gap-4 bg-yellow-50 p-4 rounded-xl border border-yellow-200 shadow-sm'>
+                <div className='flex items-center justify-center bg-yellow-400 rounded-full w-12 h-12 shadow-sm'>
+                  <Crown className='w-6 h-6 text-white' />
                 </div>
-              ))}
-            </div>
-            {Number(discountAmount) > 0 && (
+                <div>
+                  <h3 className='font-bold text-yellow-900 text-base'>
+                    {order.vip_package?.name || 'Gói Hội Viên VIP'}
+                  </h3>
+                  <p className='text-sm text-yellow-700 font-medium'>
+                    {order.vip_package?.description || `Thời hạn: ${order.vip_package?.duration_months || 1} tháng`}
+                  </p>
+                </div>
+                <div className='ml-auto font-bold text-base text-yellow-800'>{formatPrice(order.total)}</div>
+              </div>
+            ) : (
+              <div className='items order-items'>
+                {order?.items.map((item, index) => (
+                  <div key={index} className='flex justify-between text-sm mb-2 py-4 rounded-md border-b last:border-0'>
+                    <div className='flex items-center gap-2 font-medium'>
+                      <img src={item.image} alt={item.title} className='w-12 h-12 object-cover rounded-md' />
+                      <span>
+                        <p className='text-base'>{item.title}</p>
+                        <p className='font-normal text-muted-foreground'>Giảng viên: {item.instructor_name}</p>
+                      </span>
+                    </div>
+                    <span className='font-semibold'>{formatPrice(item.price)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {Number(discountAmount) > 0 && order.type !== 'VIP_SUBSCRIPTION' && (
               <div className='mt-4 flex items-center justify-between'>
                 <div className='text-sm text-gray-600'>Tạm tính</div>
                 <div className='text-lg font-semibold text-gray-800'>{formatPrice(subtotal)}</div>

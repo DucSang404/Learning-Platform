@@ -25,7 +25,7 @@ public final class CourseServiceProto {
   static {
     java.lang.String[] descriptorData = {
       "\n\023courseService.proto\032\033google/protobuf/e" +
-      "mpty.proto\032\014course.proto\032\nuser.proto2\365\005\n" +
+      "mpty.proto\032\014course.proto\032\nuser.proto2\356\005\n" +
       "\rCourseService\022/\n\tgetCourse\022\021.GetCourseR" +
       "equest\032\017.CourseResponse\0229\n\016getBulkCourse" +
       "s\022\022.GetCoursesRequest\032\023.GetCoursesRespon" +
@@ -41,12 +41,12 @@ public final class CourseServiceProto {
       "e\022M\n\022updateCourseRating\022\032.UpdateCourseRa" +
       "tingRequest\032\033.UpdateCourseRatingResponse" +
       "\022;\n\014isInstructor\022\024.IsInstructorRequest\032\025" +
-      ".IsInstructorResponse\022>\n\rgetCourseTags\022\025" +
-      ".GetCourseTagsRequest\032\026.GetCourseTagsRes" +
-      "ponse\022E\n\020getAllCourseTags\022\026.google.proto" +
-      "buf.Empty\032\031.GetAllCourseTagsResponseB-\n\025" +
-      "com.example.grpc.userB\022CourseServiceProt" +
-      "oP\001b\006proto3"
+      ".IsInstructorResponse\022>\n\rcanEditLesson\022\025" +
+      ".CanEditLessonRequest\032\026.CanEditLessonRes" +
+      "ponse\022>\n\rgetCourseTags\022\025.GetCourseTagsRe" +
+      "quest\032\026.GetCourseTagsResponseB-\n\025com.exa" +
+      "mple.grpc.userB\022CourseServiceProtoP\001b\006pr" +
+      "oto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,

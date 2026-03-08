@@ -9,7 +9,7 @@ WORKDIR /app
 COPY assistant-service/package*.json ./
 
 # Install all dependencies (including dev for build tools)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code and config
 COPY assistant-service/src ./src
@@ -36,7 +36,7 @@ WORKDIR /app
 COPY assistant-service/package*.json ./
 
 # Install only production dependencies (no dev dependencies)
-RUN npm install --omit=dev && \
+RUN npm ci --omit=dev --legacy-peer-deps && \
     npm cache clean --force && \
     rm -rf /tmp/* /var/tmp/*
 
@@ -49,6 +49,10 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
+
+# Create logs directory and set permissions
+RUN mkdir -p logs && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 

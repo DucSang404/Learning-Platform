@@ -1,6 +1,6 @@
 import axiosClient from '../../lib/axiosClient.lib'
 import { ApiResponse } from '@/types/response.type'
-import { Profile } from '@/types/profile'
+import { Profile, VipStatusResult } from '@/types/profile'
 import { DataAdminHome } from '@/types/user'
 
 class UserService {
@@ -132,6 +132,11 @@ class UserService {
     const response = await axiosClient.axiosInstance.put(`user`, form, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
+    return response.data
+  }
+
+  async getVipStatus(): Promise<ApiResponse<VipStatusResult>> {
+    const response = await axiosClient.axiosInstance.get('self/vip-status')
     return response.data
   }
 

@@ -41,6 +41,13 @@ class OrderService {
     return response.data
   }
 
+  async processVipPayment(paymentMethod: 'MOMO' | 'VNPAY', email: string): Promise<ApiResponse<OrderResponse>> {
+    const response = await axiosClient.axiosInstance.post(`/sale/orders/vip-payment/${paymentMethod}`, {
+      email
+    })
+    return response.data
+  }
+
   async getOrderInfo(orderId: string): Promise<ApiResponse<Order>> {
     const response = await axiosClient.axiosInstance.get(`/sale/orders/${orderId}/info`)
     return response.data

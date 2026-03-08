@@ -9,3 +9,7 @@ export function formatDate(iso: string): string {
     return iso
   }
 }
+
+export function formatDateObj(date: Date): string {
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import orderService from '~/service/models/order.service';
-import sendResposne from '~/dto/response/send-response';
+import sendResponse from '~/dto/response/send-response';
 import { env } from '~/config/env'
 import ApiError from '~/middleware/ApiError';
 import orderPaymentService from '~/service/models/order-payment.service';
@@ -14,7 +14,7 @@ class OrderController {
             const orderData = req.data;
 
             const newOrder = await orderService.createOrder(orderData, userId as string);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Tạo order thành công !',
                 result: newOrder
@@ -29,7 +29,7 @@ class OrderController {
             const userId = req.user?.sub;
 
             const order = await orderService.getOrder(userId as string);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Lấy order thành công !',
                 result: order
@@ -47,9 +47,27 @@ class OrderController {
             const { email } = req.data;
 
             const paymentResult = await orderService.processPayment(userId as string, email, paymentMethod, ipAddress);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Xử lý thanh toán thành công !',
+                result: paymentResult
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async processVipPayment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = req.user?.sub;
+            const paymentMethod = req.params.method;
+            const ipAddress = req.ip;
+            const { email } = req.data;
+
+            const paymentResult = await orderService.processVipPayment(userId as string, email, paymentMethod, ipAddress);
+            sendResponse(res, {
+                code: 200,
+                message: 'Khởi tạo thanh toán VIP thành công !',
                 result: paymentResult
             });
         } catch (error) {
@@ -63,7 +81,7 @@ class OrderController {
             const { discountCode } = req.data;
 
             const updatedOrder = await orderService.applyDiscount(userId as string, discountCode);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Áp dụng mã giảm giá thành công !',
                 result: updatedOrder
@@ -78,7 +96,7 @@ class OrderController {
             const query = req.query;
             const verificationResult = await orderPaymentService.verifyOrderForVnPay(query);
             if (!verificationResult.isSuccess) {
-                sendResposne(res, {
+                sendResponse(res, {
                     code: 400,
                     message: 'Xác thực đơn hàng thất bại !',
                     result: verificationResult
@@ -95,15 +113,38 @@ class OrderController {
         try {
             const query = req.query;
             const verificationResult = await orderPaymentService.verifyOrderForMomo(query);
+            return res.redirect(env.WEB_URL + verificationResult.orderId);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async verifyVipOrderForVnpay(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = req.query;
+            const verificationResult = await orderPaymentService.verifyVipOrderForVnpay(query);
             if (!verificationResult.isSuccess) {
-                sendResposne(res, {
+                sendResponse(res, {
                     code: 400,
-                    message: 'Xác thực đơn hàng thất bại !',
+                    message: 'Xác thực đơn vip thất bại !',
                     result: verificationResult
                 });
                 return;
             }
-            return res.redirect(env.WEB_URL + verificationResult.orderId);
+            return res.redirect(env.WEB_URL + 'vip-success/' + verificationResult.orderId);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async verifyVipOrderForMomo(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = req.query;
+            const verificationResult = await orderPaymentService.verifyVipOrderForMomo(query);
+            if (!verificationResult.isSuccess) {
+                return res.redirect(env.WEB_URL + verificationResult.orderId);
+            }
+            return res.redirect(env.WEB_URL + 'vip-success/' + verificationResult.orderId);
         } catch (error) {
             next(error);
         }
@@ -121,7 +162,7 @@ class OrderController {
                 throw new ApiError(401, 'Bạn không có quyền truy cập !');
 
             const data = await orderService.getOrderInfo(req.user.sub as string, orderId);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Lấy thông tin đơn hàng thành công !',
                 result: data
@@ -139,7 +180,7 @@ class OrderController {
             }
 
             const history = await orderHistoryService.getOrderHistoryByUserId(userId as string);
-            sendResposne(res, {
+            sendResponse(res, {
                 code: 200,
                 message: 'Lấy lịch sử đơn hàng thành công !',
                 result: history

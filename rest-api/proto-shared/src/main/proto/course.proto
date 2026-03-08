@@ -104,6 +104,15 @@ message IsInstructorResponse {
   bool isInstructor = 1;
 }
 
+message CanEditLessonRequest {
+  string lessonId = 1;
+  string instructorId = 2;
+}
+
+message CanEditLessonResponse {
+  bool canEdit = 1;
+}
+
 // RCM v2: get course tags
 message GetCourseTagsRequest {
   string courseId = 1;

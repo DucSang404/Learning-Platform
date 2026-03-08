@@ -1,27 +1,98 @@
 import Redis from 'ioredis'
 import { env } from '~/config/env'
+import Logger from '~/utils/logger'
+
+export interface SagaResult {
+  success: boolean
+  reason?: string
+}
 
 class RedisService {
   private redis: Redis
+  private subscriber: Redis  // dedicated connection for SUBSCRIBE mode
 
   constructor() {
-    // init redis connection
-    this.redis = new Redis({
+    const redisOptions = {
       host: env.REDIS_DB_HOST,
       port: env.REDIS_DB_PORT,
       password: env.REDIS_DB_PASSWORD,
       username: env.REDIS_DB_USER,
       db: env.REDIS_DB_NAME
-    })
+    }
+
+    this.redis = new Redis(redisOptions)
+    this.subscriber = new Redis(redisOptions)
 
     this.redis.on('connect', () => {
-      console.log('🔌 Connected to Redis')
+      Logger.info('🔌 Connected to Redis')
     })
 
     this.redis.on('error', (err: Error) => {
-      console.error('❌ Redis error:', err)
+      Logger.error(`❌ Redis error: ${err}`)
     })
   }
+
+  // ─── Pub/Sub ────────────────────────────────────────────────────────────────
+
+  /** Publish a message to a Redis channel */
+  async publish(channel: string, message: any): Promise<void> {
+    await this.redis.publish(channel, JSON.stringify(message))
+  }
+
+  /**
+   * Subscribe to a channel and wait for exactly one message.
+   * Automatically unsubscribes after receiving the message or on timeout.
+   * @param channel - Redis channel to subscribe
+   * @param timeoutMs - max wait time in ms (default: 30s)
+   */
+  waitForMessage<T = any>(channel: string, timeoutMs = 30_000): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      let settled = false
+
+      const cleanup = () => {
+        this.subscriber.unsubscribe(channel).catch(() => { })
+      }
+
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(new Error(`Timeout waiting for Redis message on channel: ${channel}`))
+      }, timeoutMs)
+
+      this.subscriber.subscribe(channel, (err) => {
+        if (err) {
+          clearTimeout(timer)
+          reject(err)
+          return
+        }
+      })
+
+      this.subscriber.on('message', (ch, rawMessage) => {
+        if (ch !== channel || settled) return
+        settled = true
+        clearTimeout(timer)
+        cleanup()
+        try {
+          resolve(JSON.parse(rawMessage) as T)
+        } catch {
+          reject(new Error(`Failed to parse Redis message from channel ${channel}: ${rawMessage}`))
+        }
+      })
+    })
+  }
+
+  /**
+   * Publish the result of a saga transaction so the payment handler can resume.
+   * Channel convention: saga:result:<orderId>
+   */
+  async publishSagaResult(orderId: string, result: SagaResult): Promise<void> {
+    const channel = `saga:result:${orderId}`
+    await this.publish(channel, result)
+    Logger.info(`publishSagaResult → ${channel}: ${JSON.stringify(result)}`)
+  }
+
+  // ─── Key-Value ──────────────────────────────────────────────────────────────
 
   async set(key: string, value: any, ttlInSec: number | null = null): Promise<void> {
     const stringValue = JSON.stringify(value)
@@ -32,13 +103,11 @@ class RedisService {
     }
   }
 
-  // set lock for booking
   async setLock(key: string, value: any, ttlInSec: number) {
     const stringValue = JSON.stringify(value)
-    return await this.redis.set(key, stringValue, 'EX', ttlInSec, 'NX') // NX (only set if not exists), EX (expire time) de tao lock, tranh 2 tien trinh cung thao tac mot tai nguyen
+    return await this.redis.set(key, stringValue, 'EX', ttlInSec, 'NX')
   }
 
-  // handle for map
   async setMap(key: string, map: Map<string, any>, ttlInSec: number | null = null): Promise<void> {
     const obj = Object.fromEntries(map)
     await this.set(key, obj, ttlInSec)
@@ -50,7 +119,6 @@ class RedisService {
     return new Map(Object.entries(obj)) as Map<K, V>
   }
 
-  // del keys
   async delMany(keys: string[]): Promise<number> {
     if (keys.length === 0) return 0
     return await this.redis.del(...keys)
@@ -76,7 +144,6 @@ class RedisService {
   }
 
   async sadd(key: string, member: any): Promise<number> {
-    // store primitives as plain strings, only JSON.stringify objects/arrays
     if (member === null || member === undefined) {
       return await this.redis.sadd(key, String(member))
     }
@@ -84,14 +151,9 @@ class RedisService {
     if (t === 'string' || t === 'number' || t === 'boolean') {
       return await this.redis.sadd(key, String(member))
     }
-    // objects/arrays: keep JSON so complex data can be restored
     return await this.redis.sadd(key, JSON.stringify(member))
   }
 
-  /**
-   * Get all members from Redis set
-   * @param key - set key
-   */
   async smembers(key: string): Promise<string[]> {
     return await this.redis.smembers(key)
   }
@@ -137,7 +199,6 @@ class RedisService {
     for (let i = 0; i < maxRetry; i++) {
       const lock = await this.setLock(lockKey, value, ttl)
       if (lock) return true
-      // Nếu chưa lấy được lock, chờ delayMs rồi thử lại
       await new Promise((res) => setTimeout(res, delayMs))
     }
     return false

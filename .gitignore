@@ -18,3 +18,9 @@ key
 
 
 .agent
+
+n8n/workflows
+*.bson
+
+
+Semantic-Chunking-Typescript

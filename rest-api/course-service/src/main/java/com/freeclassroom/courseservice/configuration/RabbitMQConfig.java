@@ -61,6 +61,29 @@ public class RabbitMQConfig {
                 .to(courseApprovalExchange)
                 .with(COURSE_APPROVAL_ROUTING_KEY);
     }
+
+    // --- config lesson analysis ---
+    public static final String LESSON_ANALYSIS_QUEUE = "lesson.analysis.queue";
+    public static final String LESSON_ANALYSIS_EXCHANGE = "lesson.analysis.exchange";
+    public static final String LESSON_ANALYSIS_ROUTING_KEY = "lesson.analysis.#";
+
+    @Bean
+    public Queue lessonAnalysisQueue() {
+        return new Queue(LESSON_ANALYSIS_QUEUE, true);
+    }
+
+    @Bean
+    public TopicExchange lessonAnalysisExchange() {
+        return new TopicExchange(LESSON_ANALYSIS_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Binding bindingLessonAnalysis(Queue lessonAnalysisQueue, TopicExchange lessonAnalysisExchange) {
+        return BindingBuilder
+                .bind(lessonAnalysisQueue)
+                .to(lessonAnalysisExchange)
+                .with(LESSON_ANALYSIS_ROUTING_KEY);
+    }
     // --- config rabbit mq ----
 
     @Bean

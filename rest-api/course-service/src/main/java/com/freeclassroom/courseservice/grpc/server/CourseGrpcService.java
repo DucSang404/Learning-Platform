@@ -13,6 +13,9 @@ import com.freeclassroom.courseservice.grpc.client.SaleGrpcClient;
 import com.freeclassroom.courseservice.grpc.client.UserGrpcClient;
 import com.freeclassroom.courseservice.repository.entity.CourseRepository;
 import com.freeclassroom.courseservice.repository.entity.EnrollmentRepository;
+import com.freeclassroom.courseservice.service.course.CourseStudentService;
+import com.freeclassroom.courseservice.service.course.CourseUserService;
+import com.freeclassroom.courseservice.service.lesson.ILessonService;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -31,6 +34,7 @@ public class CourseGrpcService extends CourseServiceImplBase {
     private final EnrollmentRepository enrollmentRepo;
     private final UserGrpcClient userGrpcClient;
     private final SaleGrpcClient saleGrpcClient;
+    private final ILessonService lessonService;
 
     @Override
     public void getCourse(GetCourseRequest request, StreamObserver<CourseResponse> responseObserver) {
@@ -385,5 +389,23 @@ public class CourseGrpcService extends CourseServiceImplBase {
                             .asRuntimeException()
             );
         }
+    }
+
+    @Override
+    public void canEditLesson(CanEditLessonRequest request, StreamObserver<CanEditLessonResponse> resObs) {
+        boolean result = false;
+        try {
+            result = lessonService.canEditLesson(request.getLessonId(), request.getInstructorId());
+        } catch (Exception e) {
+            // Return false if any issue or UNAUTHORIZED exception is thrown
+            result = false;
+        }
+
+        CanEditLessonResponse response = CanEditLessonResponse.newBuilder()
+                .setCanEdit(result)
+                .build();
+
+        resObs.onNext(response);
+        resObs.onCompleted();
     }
 }

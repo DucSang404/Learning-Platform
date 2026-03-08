@@ -1,29 +1,35 @@
 import { StatusCodes } from 'http-status-codes'
 import ApiError from './ApiError'
 import { Request, Response, NextFunction } from 'express'
+import Logger from '~/utils/logger'
 
-// Middleware xử lý lỗi tập trung trong ứng dụng Back-end NodeJS (ExpressJS)
+// Centralized error handling middleware for the NodeJS (ExpressJS) backend application
 export const errorHandlingMiddleware = (err: ApiError, req: Request, res: Response, next: NextFunction) => {
-  // Nếu dev không cẩn thận thiếu statusCode thì mặc định sẽ để code 500 INTERNAL_SERVER_ERROR
+  // If the developer forgets to set a status code, default to 500 INTERNAL_SERVER_ERROR
   if (!err.status) err.status = StatusCodes.INTERNAL_SERVER_ERROR
 
-  // Tạo ra một biến responseError để kiểm soát những gì muốn trả về
+  // Create a responseError object to control what is returned to the client
   const responseError = {
     code: err.status,
-    message: err.message || StatusCodes[err.status], // Nếu lỗi mà không có message thì lấy ReasonPhrases chuẩn theo mã Status Code
+    message: err.message || StatusCodes[err.status], // If there is no custom message, use the standard ReasonPhrase based on the Status Code
     stack: err.stack
   }
 
-  console.error('Error occurred:', responseError)
-  // console.error(responseError)
+  Logger.error(`Error occurred: ${JSON.stringify(responseError)}`)
+  // Logger.error(responseError)
 
-  // Chỉ khi môi trường là DEV thì mới trả về Stack Trace để debug dễ dàng hơn, còn không thì xóa đi. (Muốn hiểu rõ hơn hãy xem video 55 trong bộ MERN Stack trên kênh Youtube: https://www.youtube.com/@trungquandev)
+  // Only return the stack trace in DEV environment for easier debugging.
+  // Otherwise, remove it in production.
+  // (For more details, see video 55 in the MERN Stack series on the TrungQuanDev YouTube channel.)
   // if (env.BUILD_MODE !== 'dev') delete responseError.stack
 
-  // Đoạn này có thể mở rộng nhiều về sau như ghi Error Log vào file, bắn thông báo lỗi vào group Slack, Telegram, Email...vv Hoặc có thể viết riêng Code ra một file Middleware khác tùy dự án.
+  // This section can be extended in the future, such as:
+  // - Writing error logs to a file
+  // - Sending error notifications to Slack, Telegram, Email, etc.
+  // - Or moving this logic into a separate middleware depending on project structure
   // ...
-  // console.error(responseError)
+  // Logger.error(responseError)
 
-  // Trả responseError về phía Front-end
-  res.status(err.status !== 401 ? StatusCodes.OK : err.status).json(responseError)
+  // Send responseError back to the Front-end
+  res.status((err.status !== 401 && err.status !== 403) ? StatusCodes.OK : err.status).json(responseError)
 }
