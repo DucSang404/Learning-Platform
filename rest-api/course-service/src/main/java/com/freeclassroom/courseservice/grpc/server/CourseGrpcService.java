@@ -5,7 +5,7 @@ import com.example.grpc.user.*;
 import com.example.grpc.user.CourseServiceGrpc.CourseServiceImplBase;
 import com.freeclassroom.courseservice.entity.course.CourseEntity;
 import com.freeclassroom.courseservice.entity.member.EnrollmentsEntity;
-import com.freeclassroom.courseservice.enums.entity.EnumCourseProgressStep;
+import com.freeclassroom.courseservice.entity.category.TagEntity;
 import com.freeclassroom.courseservice.enums.entity.EnumCourseStatus;
 import com.freeclassroom.courseservice.exception.CustomExeption;
 import com.freeclassroom.courseservice.exception.ErrorCode;
@@ -333,7 +333,7 @@ public class CourseGrpcService extends CourseServiceImplBase {
     }
 
     @Override
-    public void isInstructor(IsInstructorRequest request, StreamObserver<IsInstructorResponse> resObs) {
+    public void isInstructor(IsInstructorRequest request, StreamObserver<IsInstructorResponse> responseObserver) {
         boolean result = courseRepo
                 .findByIdAndInstructorId(request.getCourseId(), request.getUserId())
                 .isPresent();
@@ -342,8 +342,53 @@ public class CourseGrpcService extends CourseServiceImplBase {
                 .setIsInstructor(result)
                 .build();
 
-        resObs.onNext(response);
-        resObs.onCompleted();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    // RCM v2: return course tags (topic)
+    @Override
+    public void getCourseTags(GetCourseTagsRequest request, StreamObserver<GetCourseTagsResponse> responseObserver) {
+        try {
+            String courseId = request.getCourseId();
+            if (courseId == null || courseId.isBlank()) {
+                responseObserver.onNext(GetCourseTagsResponse.newBuilder().build());
+                responseObserver.onCompleted();
+                return;
+            }
+
+            CourseEntity course = courseRepo.findByIdWithTags(courseId)
+                    .orElseThrow(() -> new CustomExeption(ErrorCode.COURSE_NOT_FOUND));
+
+            List<String> tags = Optional.ofNullable(course.getTags())
+                    .orElseGet(Collections::emptyList)
+                    .stream()
+                    .map(TagEntity::getName)
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+
+            GetCourseTagsResponse response = GetCourseTagsResponse.newBuilder()
+                    .addAllTags(tags)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (CustomExeption e) {
+            responseObserver.onError(
+                    Status.NOT_FOUND
+                            .withDescription(e.getMessage())
+                            .asRuntimeException()
+            );
+        } catch (Exception e) {
+            responseObserver.onError(
+                    Status.INTERNAL
+                            .withDescription("Failed to load course tags: " + e.getMessage())
+                            .asRuntimeException()
+            );
+        }
     }
 
     @Override

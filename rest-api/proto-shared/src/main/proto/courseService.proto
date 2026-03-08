@@ -19,4 +19,5 @@ service CourseService {
   rpc updateCourseRating(UpdateCourseRatingRequest) returns (UpdateCourseRatingResponse);
   rpc isInstructor(IsInstructorRequest) returns (IsInstructorResponse);
   rpc canEditLesson(CanEditLessonRequest) returns (CanEditLessonResponse);
+  rpc getCourseTags(GetCourseTagsRequest) returns (GetCourseTagsResponse);
 }

@@ -41,6 +41,9 @@ import { SocketProvider } from '@/api/socket/socket.context'
 import DiscountsAdmin from './pages/AD_Discounts'
 import AuthenticationGate from '@/components/auth-gate/AuthenticationGate'
 import VipSuccess from './pages/VipSuccess'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
 
 const router = createBrowserRouter([
   {
@@ -119,8 +122,10 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <>
-    <SocketProvider>
-      <RouterProvider router={router} />
-    </SocketProvider>
+    <QueryClientProvider client={queryClient}>
+      <SocketProvider>
+        <RouterProvider router={router} />
+      </SocketProvider>
+    </QueryClientProvider>
   </>
 )
