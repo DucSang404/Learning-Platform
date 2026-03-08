@@ -1,5 +1,6 @@
 import Redis from 'ioredis'
 import { env } from '~/config/env'
+import Logger from '~/utils/logger'
 
 class RedisService {
   private redis: Redis
@@ -15,11 +16,11 @@ class RedisService {
     })
 
     this.redis.on('connect', () => {
-      console.log('🔌 Connected to Redis')
+      Logger.info('🔌 Connected to Redis')
     })
 
     this.redis.on('error', (err: Error) => {
-      console.error('❌ Redis error:', err)
+      Logger.error(`❌ Redis error: ${err}`)
     })
   }
 
@@ -172,6 +173,36 @@ class RedisService {
   async rpush(key: string, value: any): Promise<number> {
     const stringValue = typeof value === 'string' ? value : JSON.stringify(value)
     return await this.redis.rpush(key, stringValue)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pub / Sub
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Publish a message to a Redis channel.
+   * Returns the number of subscribers that received the message.
+   */
+  async publish(channel: string, data: unknown): Promise<number> {
+    const payload = typeof data === 'string' ? data : JSON.stringify(data)
+    return await this.redis.publish(channel, payload)
+  }
+
+  /**
+   * Create a *dedicated* Redis connection for subscribing.
+   * ioredis (and Redis itself) requires a separate connection for pub/sub —
+   * once a connection enters subscriber mode it can only issue subscribe/unsubscribe/psubscribe.
+   *
+   * Callers are responsible for calling .disconnect() when done.
+   */
+  createSubscriber(): Redis {
+    return new Redis({
+      host: env.REDIS_DB_HOST,
+      port: env.REDIS_DB_PORT,
+      password: env.REDIS_DB_PASSWORD,
+      username: env.REDIS_DB_USER,
+      db: env.REDIS_DB_NAME,
+    })
   }
 }
 

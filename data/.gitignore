@@ -1,0 +1,69 @@
+# ======================
+# Python virtual env
+# ======================
+venv/
+.env/
+.envrc/
+
+# ======================
+# Python cache
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ======================
+# Jupyter Notebook
+# ======================
+.ipynb_checkpoints/
+*.ipynb~
+
+# ======================
+# Dataset / data files
+# ======================
+data/
+datasets/
+*.csv
+*.tsv
+*.json
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.parquet
+*.h5
+*.hdf5
+
+# ======================
+# Kaggle
+# ======================
+kaggle.json
+
+# ======================
+# Logs & outputs
+# ======================
+logs/
+*.log
+outputs/
+results/
+models/
+checkpoints/
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ======================
+# Python packaging
+# ======================
+build/
+dist/
+*.egg-info/
+
+
+script.txt

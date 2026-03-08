@@ -1,19 +1,17 @@
 import { HouseHeart, Info } from 'lucide-react'
 import Countdown from 'react-countdown'
 import { useNavigate } from 'react-router-dom'
-import CustomButton from '@/components/common/Button'
 import successIcon from '@/assets/images/success-icon.gif'
 import failIcon from '@/assets/images/fail-icon.gif'
 import pendingIcon from '@/assets/images/pending-icon.webp'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Order, OrderStatus } from '@/types/order.type'
-
-const formatCurrency = (v?: number) => (v ?? 0).toLocaleString('vi-VN') + ' VNĐ'
+import { formatCurrency } from '@/utils/common/formatPrice'
 
 const OrderSuccess = ({ order, id }: { order: Order; id: string }) => {
   const navigate = useNavigate()
 
-  // Tính tạm tính từ tổng giá các khóa học
+  // cal from price of courses
   const subtotal = order?.items?.reduce((sum, item) => sum + (item.price || 0), 0) || 0
   const calculateDiscountAmount = () => {
     if (!order?.discount) return 0
@@ -90,83 +88,78 @@ const OrderSuccess = ({ order, id }: { order: Order; id: string }) => {
   })()
 
   return (
-    <div className='my-5 flex items-center justify-center'>
+    <div className='flex items-center justify-center'>
       <div className='max-w-3xl w-full p-8 rounded-xl'>
         {statusBlock}
-        <Card className='border-none shadow-0'>
-          <CardHeader>
-            <CardTitle className='text-sm flex items-center gap-1'>
+        <Card className='border border-gray-100 shadow-sm rounded-xl mt-8'>
+          <CardHeader className='pb-2 pt-4'>
+            <CardTitle className='text-xs flex items-center gap-1 text-gray-400 font-normal'>
               <Info className='w-4 h-4' />
-              Thông tin đơn hàng của bạn !
+              Thông tin đơn hàng của bạn
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className='bg-gray-50 rounded-lg px-4'>
+          <CardContent className='pb-4'>
+            <div className='bg-gray-50/50 rounded-lg px-4 border border-gray-50'>
               <div className='items order-items'>
                 {order?.items.map((item, index) => (
-                  <div key={index} className='flex justify-between text-sm mb-2 py-4 rounded-md'>
-                    <div className='flex items-center gap-2 font-medium'>
-                      <img src={item.image} alt={item.title} className='w-8 h-8 object-cover rounded-md' />
+                  <div key={index} className='flex justify-between text-sm mb-2 py-4 border-b border-gray-100 last:border-0'>
+                    <div className='flex items-center gap-3 font-medium'>
+                      <img src={item.image} alt={item.title} className='w-10 h-10 object-cover rounded-md shadow-sm border border-gray-100' />
                       <span>
-                        <p>{item.title}</p>
-                        <p className='font-normal text-gray-800'>@{item.instructor_name}</p>
+                        <p className='text-gray-900'>{item.title}</p>
+                        <p className='font-normal text-xs text-gray-500 mt-0.5'>@{item.instructor_name}</p>
                       </span>
                     </div>
-                    <span>{formatCurrency(item.price)} VNĐ</span>
+                    <span className='font-medium text-gray-800 flex items-center'>{formatCurrency(item.price)} VNĐ</span>
                   </div>
                 ))}
               </div>
-              <div className='mt-4 flex items-center justify-between'>
-                <div className='text-sm text-gray-600'>Tạm tính</div>
-                <div className='text-lg font-semibold text-gray-800'>{formatCurrency(subtotal)}</div>
+              <div className='py-3 flex items-center justify-between border-t border-gray-100 mt-2'>
+                <div className='text-sm text-gray-500'>Tạm tính</div>
+                <div className='text-sm font-semibold text-gray-800'>{formatCurrency(subtotal)}</div>
               </div>
               {order?.discount && (
                 <>
-                  <div className='mt-3 flex items-center justify-between bg-green-50 p-3 rounded-md border border-green-200'>
+                  <div className='mt-2 flex items-center justify-between bg-green-50 p-3 rounded-md border border-green-100/50'>
                     <div className='flex items-center gap-2'>
                       <span className='text-sm font-medium text-green-700'>Mã giảm: {order.discount.code}</span>
-                      <span className='text-xs bg-green-100 text-green-700 px-2 py-1 rounded'>
+                      <span className='text-xs bg-green-100/80 text-green-700 px-2 py-0.5 rounded-sm'>
                         {order.discount.type === 'Percent' ? `${order.discount.value}%` : 'Cố định'}
                       </span>
                     </div>
                     <div className='text-sm font-semibold text-green-700'>-{formatCurrency(discountAmount)}</div>
                   </div>
-                  <div className='mt-4 flex items-center justify-between border-t pt-4'>
+                  <div className='mt-3 flex items-center justify-between pt-3 pb-2'>
                     <div className='text-sm font-semibold text-gray-700'>Tổng cộng</div>
-                    <div className='text-xl font-bold text-blue-600'>{formatCurrency(order?.total)}</div>
+                    <div className='text-lg font-bold text-blue-600'>{formatCurrency(order?.total)}</div>
                   </div>
                 </>
               )}
             </div>
           </CardContent>
         </Card>
-        <div className='mt-6 flex justify-center'>
-          <CustomButton
+
+        {/* Auto-redirect */}
+        <div className='mt-8 flex flex-col items-center gap-3'>
+          <button
             onClick={() => navigate('/')}
-            label={
-              <Countdown
-                date={Date.now() + 5 * 60 * 1000}
-                onComplete={() => navigate('/')}
-                renderer={({ minutes, seconds, completed }) => {
-                  if (completed) {
-                    navigate('/')
-                    return <div>Quay về trang chủ</div>
-                  }
-                  const mm = String(minutes).padStart(2, '0')
-                  const ss = String(seconds).padStart(2, '0')
-                  return (
-                    <div className='flex flex-col items-center'>
-                      <span>
-                        Quay về trang chủ sau <span className='font-bold'>{`${mm}:${ss}`}</span>
-                      </span>
-                    </div>
-                  )
-                }}
-              />
-            }
-            icon={<HouseHeart className='h-5 w-5' />}
-            className='px-6 py-2 rounded-md border border-gray-200 hover:shadow-lg shadow-md'
-          />
+            className='inline-flex items-center gap-2 px-8 py-2.5 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm'
+          >
+            <HouseHeart className='w-4 h-4' />
+            Quay về trang chủ
+          </button>
+          <p className='text-xs text-gray-400'>
+            <Countdown
+              date={Date.now() + 5 * 60 * 1000}
+              onComplete={() => navigate('/')}
+              renderer={({ minutes, seconds, completed }) => {
+                if (completed) return null
+                const mm = String(minutes).padStart(2, '0')
+                const ss = String(seconds).padStart(2, '0')
+                return <span>Tự động chuyển hướng sau <span className='font-semibold text-gray-600'>{mm}:{ss}</span></span>
+              }}
+            />
+          </p>
         </div>
       </div>
     </div>

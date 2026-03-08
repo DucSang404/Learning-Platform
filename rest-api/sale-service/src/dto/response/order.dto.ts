@@ -7,6 +7,7 @@ export interface OrderDto {
     customer_email: string;
     total: number;
     status: OrderStatus;
+    type?: string;
     discount?: {
         code: string;
         type: DiscountType;
@@ -22,5 +23,10 @@ export interface OrderDto {
         instructor_id: string;
         image: string;
     }[];
+    vip_package?: {
+        name: string;
+        duration_months: number;
+        description?: string;
+    };
     ttl?: number;
 }

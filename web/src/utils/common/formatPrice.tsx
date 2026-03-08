@@ -5,4 +5,6 @@ const formatPrice = (value?: number | string) => {
   return `${new Intl.NumberFormat('vi-VN').format(n)} VND`
 }
 
+export const formatCurrency = (v?: number) => (v ?? 0).toLocaleString('vi-VN') + ' ₫'
+
 export default formatPrice

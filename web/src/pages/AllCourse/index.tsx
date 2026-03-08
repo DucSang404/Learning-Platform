@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, MouseEvent } from 'react'
 import { CourseCard } from '@/components/AllCourse/CourseCard'
 import CourseCardListSkeleton from '@/components/AllCourse/CourseCardListSkeleton'
 import { FilterSidebar } from '@/components/AllCourse/FilterSidebar'
 import { SortBar } from '@/components/AllCourse/SortBar'
-import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import CustomPagination from '@/components/common/Pagination/CustomPagination'
 import instructorAvatar from '@/assets/images/course.jpg'
 import courseService from '@/services/course/course-user.service'
 import useDebounce from '@/hooks/useDebounce.hook'
@@ -181,13 +180,13 @@ const Index = () => {
     [filteredItems]
   )
 
-  const paginationItems = useMemo(() => {
-    // Keep pagination compact to avoid UI overflow.
-    // Smaller screens get fewer siblings.
-    const siblingCount = 1
-    const boundaryCount = 1
-    return getPaginationItems(totalPages, currentPage, siblingCount, boundaryCount)
-  }, [totalPages, currentPage])
+  // const paginationItems = useMemo(() => {
+  //   // Keep pagination compact to avoid UI overflow.
+  //   // Smaller screens get fewer siblings.
+  //   const siblingCount = 1
+  //   const boundaryCount = 1
+  //   return getPaginationItems(totalPages, currentPage, siblingCount, boundaryCount)
+  // }, [totalPages, currentPage])
 
   return (
     <div className='flex flex-col md:flex-row min-h-screen bg-white'>
@@ -251,40 +250,12 @@ const Index = () => {
           </div>
 
           <div className='flex items-center justify-center gap-2'>
-            <Button
-              variant='outline'
-              size='icon'
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1 || busy}
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </Button>
-
-            {paginationItems.map((item, idx) =>
-              item === 'ellipsis' ? (
-                <Button key={`ellipsis-${idx}`} variant='outline' size='icon' disabled aria-hidden>
-                  …
-                </Button>
-              ) : (
-                <Button
-                  key={item}
-                  variant={currentPage === item ? 'default' : 'outline'}
-                  size='icon'
-                  onClick={() => !busy && setCurrentPage(item)}
-                >
-                  {item}
-                </Button>
-              )
-            )}
-
-            <Button
-              variant='outline'
-              size='icon'
-              onClick={() => !busy && setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages || busy}
-            >
-              <ChevronRight className='h-4 w-4' />
-            </Button>
+            <CustomPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              loading={loading}
+            />
           </div>
         </div>
       </main>

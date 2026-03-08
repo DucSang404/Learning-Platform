@@ -3,12 +3,14 @@ import nodeMailService from '~/services/mails/nodemail.service'
 import { OrderConfirm } from '~/dto/request/notification.dto'
 import { QueueNameEnum } from '~/enums/rabbitQueue.enum'
 import chatService from '~/services/chat.service'
+import Logger from '~/utils/logger'
 
 
 class NotificationHandler {
   // Process when receiving event register.created.v1 -> save order with status Completed
   async handleSendEmailConfirm(message: NotificationPayload) {
     try {
+      Logger.info(`[NotificationHandler] Received email confirmation request for ${message.customer_email}. Items: ${message.items?.length}. Type: ${(message as any).orderType}`);
       const notification = {
         type: QueueNameEnum.ORDERCONFIRM,
         email: message.customer_email,
@@ -23,7 +25,7 @@ class NotificationHandler {
         ),
       ])
     } catch (error) {
-      console.error('Error handling order created notification:', error)
+      Logger.error(`Error handling order created notification: ${error}`)
     }
   }
 }

@@ -36,7 +36,6 @@ build/
 /src/main/resources/application.yaml
 /src/main/resources/cloudfront-private-key.pem
 
-/target
 /uploads
 
 /src/main/resources/cloudfront-private-key.pem
