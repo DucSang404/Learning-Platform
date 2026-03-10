@@ -23,6 +23,7 @@ import com.freeclassroom.courseservice.repository.entity.CourseRepository;
 import com.freeclassroom.courseservice.repository.entity.EnrollmentRepository;
 import com.freeclassroom.courseservice.search.CourseEsDocument;
 import com.freeclassroom.courseservice.search.CourseSearchService;
+import com.freeclassroom.courseservice.service.cache.RedisCacheService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,6 +57,8 @@ public class CourseUserService implements ICourseUserService{
     CourseMapper courseMapper;
     InstructorMapper instructorMapper;
     CourseSearchService courseSearchService;
+
+    RedisCacheService redisCacheService;
 
     @Override
     public ApiResponse<CourseUserDetailResponse> getCourseDetail(String id, String userId) {
@@ -156,11 +160,35 @@ public class CourseUserService implements ICourseUserService{
 
     @Override
     public ApiResponse<List<CourseUserResponse>> getBestSellerCourse(int limit) {
+        final String key = "best_seller_courses";
+        final Duration ttl = Duration.ofSeconds(86400);
+
         try {
+            // 1) Check Redis
+            List<CourseUserResponse> cached = redisCacheService.get(
+                    key,
+                    redisCacheService.listOf(CourseUserResponse.class)
+            );
+            if (cached != null) {
+                log.debug("Best-seller cache hit key='{}' size={}", key, cached.size());
+                // keep existing API contract: still apply limit
+                List<CourseUserResponse> limited = cached.size() <= limit ? cached : cached.subList(0, limit);
+                return ApiResponse.<List<CourseUserResponse>>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Thành công")
+                        .result(limited)
+                        .build();
+            }
+
+            log.debug("Best-seller cache miss key='{}' -> querying DB", key);
+
+            // 2) Query DB
             Pageable pageable = PageRequest.of(0, limit);
             List<CourseEntity> courseEntities = courseRepo.findBestSellerCourses(pageable);
-
             List<CourseUserResponse> courses = getInstructorGrpc(courseEntities);
+
+            // 3) Save to Redis with TTL = 1 day
+            redisCacheService.set(key, courses, ttl);
 
             return ApiResponse.<List<CourseUserResponse>>builder()
                     .code(HttpStatus.OK.value())
@@ -169,7 +197,7 @@ public class CourseUserService implements ICourseUserService{
                     .build();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("getBestSellerCourse failed", e);
             return ApiResponse.<List<CourseUserResponse>>builder()
                     .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
                     .message("Lỗi: " + e.getMessage())
