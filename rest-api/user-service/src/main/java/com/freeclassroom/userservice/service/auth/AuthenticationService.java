@@ -169,7 +169,7 @@ public class AuthenticationService implements IAuthenticationService {
     }
 
     @Override
-    public ApiResponse<AuthResponse> oauth2GoogleAuth(String authorizationCode) throws JOSEException {
+    public ApiResponse<AuthResponse> oauth2GoogleAuth(String authorizationCode, Identity identity) throws JOSEException {
         // verify authorization code
         var response = googleAuthClient.exchanceToken(
                 GoogleExchanceTokenRequest.builder()
@@ -199,6 +199,14 @@ public class AuthenticationService implements IAuthenticationService {
 
         String refreshToken = jwtService.generateToken(account, TokenEnum.REFRESH_TOKEN);
         saveRefreshTokenToRedis(refreshToken, account.getId());
+
+        if (identity != null && "GUEST".equals(identity.getType())) {
+            try {
+                eventService.mergeGuestEventsToUser(identity.getId(), account.getId());
+            } catch (Exception e) {
+                log.warn("Failed to merge guest features into user", e);
+            }
+        }
 
         return ApiResponse.<AuthResponse>builder()
                 .code(200)
