@@ -27,7 +27,7 @@
 //            return;
 //        }
 //
-//        log.info("Starting startup migration: courses (id,tags) -> Elasticsearch");
+//        log.info("Starting startup migration: courses (full document) -> Elasticsearch");
 //        try {
 //            migrationService.migrateAllCoursesIdAndTags();
 //        } catch (Exception ex) {
@@ -39,4 +39,3 @@
 //        }
 //    }
 //}
-//
