@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import useLockBodyScroll from '@/hooks/useLockBodyScroll'
 import categoryService from '@/services/course/category.service'
 import eventTracker from '@/services/personalize/eventTracker'
+import personalizationService from '@/services/personalize/personalization.service'
 import tagsService from '@/services/course/tags.service'
+import { useAuthStore } from '@/stores/useAuth.stores'
 
 export type ExplorePreferencesPayload = {
   categories: string[]
@@ -26,6 +28,17 @@ function parseKeywords(raw: string): string[] {
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean)
+}
+
+function normalizeSelection(values: string[]): string[] {
+  return Array.from(new Set(values.map((v) => v.trim().toLowerCase()).filter(Boolean))).sort()
+}
+
+function sameSelection(a: string[], b: string[]): boolean {
+  const left = normalizeSelection(a)
+  const right = normalizeSelection(b)
+  if (left.length !== right.length) return false
+  return left.every((v, index) => v === right[index])
 }
 
 type CategoryOption = MultiSelectOption & { description: string }
@@ -55,6 +68,7 @@ export default function ExplorePreferencesModal({
   onSave?: (payload: ExplorePreferencesPayload) => void
 }) {
   useLockBodyScroll(open)
+  const userId = useAuthStore((state) => state.data?.userId)
 
   const initialCachedTagOptions = useMemo(() => {
     const cachedResponse = tagsService.getCachedAllTags()
@@ -73,6 +87,63 @@ export default function ExplorePreferencesModal({
   const [categoryError, setCategoryError] = useState('')
   const [tagError, setTagError] = useState('')
   const [keywordError, setKeywordError] = useState('')
+  const [initialCategories, setInitialCategories] = useState<string[]>([])
+  const [initialTags, setInitialTags] = useState<string[]>([])
+  const [initialKeywords, setInitialKeywords] = useState<string[]>([])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadPersonalization = async () => {
+      if (!open) return
+
+      if (!userId) {
+        if (!isCancelled) {
+          setCategories([])
+          setTags([])
+          setKeywordText('')
+          setInitialCategories([])
+          setInitialTags([])
+          setInitialKeywords([])
+        }
+        return
+      }
+
+      try {
+        const response = await personalizationService.getByUserId(userId)
+        const result = response?.result
+        if (!result || isCancelled) return
+
+        const categoryValueByLabel = new Map(
+          categoryOptions.map((option) => [option.label.trim().toLowerCase(), option.value])
+        )
+        const tagValueByLabel = new Map(tagOptions.map((option) => [option.label.trim().toLowerCase(), option.value]))
+
+        const nextCategories = (result.categories ?? [])
+          .map((item) => categoryValueByLabel.get(item.trim().toLowerCase()))
+          .filter((item): item is string => Boolean(item))
+        const nextTags = (result.tags ?? [])
+          .map((item) => tagValueByLabel.get(item.trim().toLowerCase()))
+          .filter((item): item is string => Boolean(item))
+
+        setCategories(nextCategories)
+        setTags(nextTags)
+        const nextKeywords = result.longDescriptions ?? []
+        setKeywordText(nextKeywords.join(', '))
+        setInitialCategories(nextCategories)
+        setInitialTags(nextTags)
+        setInitialKeywords(nextKeywords)
+      } catch {
+        // keep UX non-blocking if personalization API temporarily fails
+      }
+    }
+
+    void loadPersonalization()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [open, userId, categoryOptions, tagOptions])
 
   const categoryLabelByValue = useMemo(
     () => new Map(categoryOptions.map((option) => [option.value, option.label])),
@@ -223,6 +294,15 @@ export default function ExplorePreferencesModal({
     setIsSaving(true)
 
     try {
+      if (userId) {
+        await personalizationService.save({
+          userId,
+          categories: categories.map((v) => categoryLabelByValue.get(v) ?? v),
+          tags: tags.map((v) => tagLabelByValue.get(v) ?? v),
+          longDescriptions: parsedKeywords
+        })
+      }
+
       await eventTracker.trackingEvent('EXPLORE_PREFERENCES', {
         category: categories.map((v) => categoryLabelByValue.get(v) ?? v).join(', '),
         tag: tags.map((v) => tagLabelByValue.get(v) ?? v).join(', '),
@@ -240,9 +320,17 @@ export default function ExplorePreferencesModal({
     onSave?.(payload)
     onOpenChange(false)
     setIsSaving(false)
-  }, [categories, categoryLabelByValue, isSaving, parsedKeywords, onOpenChange, onSave, tagLabelByValue, tags])
+  }, [categories, categoryLabelByValue, isSaving, parsedKeywords, onOpenChange, onSave, tagLabelByValue, tags, userId])
 
-  const isSaveDisabled = allSelections.length === 0 || isSaving
+  const hasChanges = useMemo(
+    () =>
+      !sameSelection(categories, initialCategories) ||
+      !sameSelection(tags, initialTags) ||
+      !sameSelection(parsedKeywords, initialKeywords),
+    [categories, initialCategories, tags, initialTags, parsedKeywords, initialKeywords]
+  )
+
+  const isSaveDisabled = !hasChanges || isSaving
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -445,14 +533,12 @@ export default function ExplorePreferencesModal({
                         Gỡ hết lựa chọn
                       </button>
                       <CustomButton
-                        variant='modal-ghost'
-                        className='text-white hover:text-red-600'
+                        className='text-white hover:text-red-600 bg-transparent hover:bg-transparent'
                         label='Hủy'
                         onClick={() => onOpenChange(false)}
                       />
                       <CustomButton
-                        variant='modal-primary'
-                        className='text-white hover:text-green-500'
+                        className='text-white hover:text-green-500 bg-transparent hover:bg-transparent'
                         label='Lưu sở thích'
                         onClick={handleSave}
                         disabled={isSaveDisabled}
