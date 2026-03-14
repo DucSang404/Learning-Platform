@@ -12,5 +12,5 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TrackingEventRequest {
     String eventName;
-    Map<String, String> payload;
+    Map<String, Object> payload;
 }

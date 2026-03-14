@@ -10,7 +10,7 @@ import java.text.ParseException;
 
 public interface IAuthenticationService {
     ApiResponse<AuthResponse> authentication (AuthRequest request, Identity identity) throws JOSEException;
-    ApiResponse<AuthResponse> oauth2GoogleAuth(String authorizationCode) throws JOSEException;
+    ApiResponse<AuthResponse> oauth2GoogleAuth(String authorizationCode, Identity identity) throws JOSEException;
     void logout (LogoutRequest request);
     ApiResponse<IntrospectResponse> introspect (IntrospectRequest request);
     ApiResponse<AuthResponse> refreshToken(RefreshTokenRequest request) throws JOSEException, ParseException;
