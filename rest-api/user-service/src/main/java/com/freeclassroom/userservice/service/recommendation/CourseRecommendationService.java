@@ -1,5 +1,7 @@
 package com.freeclassroom.userservice.service.recommendation;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freeclassroom.userservice.dto.request.auth.Identity;
 import com.freeclassroom.userservice.dto.response.ApiResponse;
 import com.freeclassroom.userservice.dto.response.recommendation.RecommendedCourseItem;
@@ -9,6 +11,9 @@ import com.freeclassroom.userservice.infrastructure.elasticsearch.TrackingEventI
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -22,8 +27,10 @@ public class CourseRecommendationService {
 
     TrackingEventIndexService trackingEventIndexService;
     CourseIndexService courseIndexService;
+    StringRedisTemplate redis;
 
     private static final int MAX_SIZE = 50;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     // candidate pool multiplier so we have room to rank after mixing sources
     private static final int CANDIDATE_MULTIPLIER = 8;
@@ -44,6 +51,24 @@ public class CourseRecommendationService {
 
     // Ensure a minimum portion of candidates come from tagScore-driven retrieval.
     private static final int MIN_TAG_CANDIDATES = 120;
+
+    private static final long RECENT_WINDOW_MS = 3L * 60 * 1000; // last 3 minutes
+    private static final int RECENT_EVENT_SCAN_LIMIT = 300;
+    private static final int RECENT_EVENT_KEEP = 25;
+
+    // recent-topic scoring (before normalization)
+    private static final double RECENT_CATEGORY_MATCH_SCORE = 5d;
+    private static final double RECENT_TAG_MATCH_SCORE = 3d;
+    private static final double RECENT_KEYWORD_MATCH_SCORE = 4d;
+
+    // latest events get stronger weights
+    private static final double LATEST_EVENT_WEIGHT = 1.5d;
+    private static final double MID_EVENT_WEIGHT = 1.0d;
+    private static final double OLDER_EVENT_WEIGHT = 0.5d;
+
+    // If recent intent exists, dominate ranking with recent-topic score.
+    private static final double W_RECENT_TOPIC_PRIORITY = 0.85d;
+    private static final double W_HISTORY_FALLBACK = 0.15d;
 
     private boolean isUser(Identity identity) {
         return identity != null && "USER".equals(identity.getType()) && identity.getId() != null && !identity.getId().isBlank();
@@ -73,7 +98,7 @@ public class CourseRecommendationService {
         // Build a stable ranked list independent from requested page size.
         // We rank from a candidate pool sized on the requested pageSize, then do limit-based pagination.
         int desiredTotal = pageSize * (pageNumber + 1);
-        List<RecommendedCourseItem> all = buildRankedRecommendations(source, courseId, tag, desiredTotal, pageSize);
+        List<RecommendedCourseItem> all = buildRankedRecommendations(source, subjectType, userId, courseId, tag, desiredTotal, pageSize);
 
         int from = Math.min(offset, all.size());
         int to = Math.min(from + pageSize, all.size());
@@ -113,6 +138,8 @@ public class CourseRecommendationService {
     }
 
     private List<RecommendedCourseItem> buildRankedRecommendations(Map<String, Object> source,
+                                                                   String subjectType,
+                                                                   String subjectId,
                                                                    String preferredCourseId,
                                                                    String preferredTag,
                                                                    int desiredTotal,
@@ -141,6 +168,13 @@ public class CourseRecommendationService {
         List<String> tagScoreTagsRaw = buildTopTagsForSearch(tagScoreRawKeys, trimTag(preferredTag));
         List<String> categorySignals = buildTopSignalsForSearch(categoryScoreRawKeys, null);
         List<String> keywordSignals = buildTopSignalsForSearch(keywordScoreRawKeys, null);
+
+        RecentIntent recentIntent = loadRecentIntent(subjectType, subjectId);
+        if (recentIntent.hasRecentActivity()) {
+            tagScoreTagsRaw = mergeTopSignals(recentIntent.topTags(), tagScoreTagsRaw, 30);
+            categorySignals = mergeTopSignals(recentIntent.topCategories(), categorySignals, 30);
+            keywordSignals = mergeTopSignals(recentIntent.topKeywords(), keywordSignals, 30);
+        }
 
         if (!lastCategories.isEmpty()) {
             categorySignals = mergeTopSignals(categorySignals, lastCategories, 20);
@@ -203,13 +237,28 @@ public class CourseRecommendationService {
 
         double maxEsScore = computeMaxEsScore(candidateHits);
 
+        Map<String, Double> recentRawByCourseId = new HashMap<>();
+        double maxRecentRaw = 0d;
+        if (recentIntent.hasRecentActivity()) {
+            for (Map<String, Object> h : candidateHits) {
+                String cId = extractCourseIdFromCourseDoc(h);
+                if (cId == null || cId.isBlank()) continue;
+
+                List<String> tags = toStringList(h.get("tags"));
+                String category = firstString(h.get("category"));
+                double recentRaw = computeRecentIntentMatchScore(tags, category, h, recentIntent);
+                recentRawByCourseId.put(cId, recentRaw);
+                if (recentRaw > maxRecentRaw) maxRecentRaw = recentRaw;
+            }
+        }
+
         Map<String, RecommendedCourseItem> byCourseId = new HashMap<>();
 
         // Seed with explicit courseScore ids (in case ES returns none).
         for (String csId : courseScoreIds) {
             if (csId == null || csId.isBlank()) continue;
             double popularityScore = 0.5;
-            double score = computeFinalScore(
+                double historicalScore = computeFinalScore(
                     List.of(),
                     null,
                     csId,
@@ -224,10 +273,12 @@ public class CourseRecommendationService {
                     0d,
                     maxEsScore
             );
+                    double recentRaw = recentRawByCourseId.getOrDefault(csId, 0d);
+                    double score = blendWithRecentIntent(historicalScore, recentRaw, maxRecentRaw, recentIntent.hasRecentActivity());
             byCourseId.putIfAbsent(csId, RecommendedCourseItem.builder()
                     .courseId(csId)
                     .score(score)
-                    .reason("courseScore")
+                        .reason(recentRaw > 0d ? "recentTopic" : "courseScore")
                     .build());
         }
 
@@ -239,10 +290,11 @@ public class CourseRecommendationService {
             String category = firstString(h.get("category"));
             double esScore = firstDoubleOrDefault(h.get("_esScore"), 0d);
             String reason = deriveReason(cId, tags, category,
-                    courseScore, tagScoreNormalizedKeys, categoryScoreNormalizedKeys, keywordSignals, h, lastCourseTags);
+                    courseScore, tagScoreNormalizedKeys, categoryScoreNormalizedKeys, keywordSignals, h, lastCourseTags,
+                    recentIntent, recentRawByCourseId.getOrDefault(cId, 0d));
 
             double popularityScore = 0.5;
-            double score = computeFinalScore(
+                double historicalScore = computeFinalScore(
                     tags,
                     category,
                     cId,
@@ -257,6 +309,8 @@ public class CourseRecommendationService {
                     esScore,
                     maxEsScore
             );
+                    double recentRaw = recentRawByCourseId.getOrDefault(cId, 0d);
+                    double score = blendWithRecentIntent(historicalScore, recentRaw, maxRecentRaw, recentIntent.hasRecentActivity());
 
             RecommendedCourseItem existing = byCourseId.get(cId);
             if (existing == null || score > existing.getScore()) {
@@ -282,6 +336,192 @@ public class CourseRecommendationService {
         }
 
         return ranked;
+    }
+
+    private static double blendWithRecentIntent(double historicalScore,
+                                                double recentRawScore,
+                                                double maxRecentRaw,
+                                                boolean hasRecentIntent) {
+        if (!hasRecentIntent) return historicalScore;
+
+        double recentNormalized = normalize01(recentRawScore, maxRecentRaw <= 0d ? 1d : maxRecentRaw);
+        return (W_RECENT_TOPIC_PRIORITY * recentNormalized) + (W_HISTORY_FALLBACK * historicalScore);
+    }
+
+    private RecentIntent loadRecentIntent(String subjectType, String subjectId) {
+        if (subjectType == null || subjectType.isBlank() || subjectId == null || subjectId.isBlank()) {
+            return RecentIntent.empty();
+        }
+
+        String stream = "USER".equals(subjectType) ? "event:user" : "event:guest";
+        List<MapRecord<String, Object, Object>> records;
+
+        try {
+            records = redis.opsForStream().range(stream, Range.unbounded());
+        } catch (Exception ignored) {
+            return RecentIntent.empty();
+        }
+
+        if (records == null || records.isEmpty()) return RecentIntent.empty();
+
+        long nowMs = System.currentTimeMillis();
+        long minTs = nowMs - RECENT_WINDOW_MS;
+        int scanned = 0;
+
+        List<RecentEventSignal> recentEvents = new ArrayList<>();
+        for (int i = records.size() - 1; i >= 0; i--) {
+            if (scanned >= RECENT_EVENT_SCAN_LIMIT) break;
+            scanned++;
+
+            MapRecord<String, Object, Object> record = records.get(i);
+            if (record == null || record.getValue() == null) continue;
+
+            Map<Object, Object> value = record.getValue();
+            String uid = firstString(value.get("userId"));
+            if (uid == null || !uid.equals(subjectId)) continue;
+
+            long ts = toLongOrDefault(value.get("createdAt"), 0L);
+            if (ts <= 0L || ts < minTs) {
+                if (!recentEvents.isEmpty()) break;
+                continue;
+            }
+
+            List<String> categories = splitCsvNormalized(firstString(value.get("category")));
+            List<String> tags = splitCsvNormalized(firstString(value.get("tag")));
+            List<String> keywords = extractKeywordsFromPayload(value.get("payload"));
+
+            // Fallback to tag/category tokens in payload if explicit fields are missing.
+            if (categories.isEmpty() || tags.isEmpty() || keywords.isEmpty()) {
+                Map<String, Object> payloadMap = parsePayloadMap(firstString(value.get("payload")));
+                if (categories.isEmpty()) {
+                    categories = mergeTopSignals(categories,
+                            splitCsvNormalized(firstString(payloadMap.get("category"))), 10);
+                }
+                if (tags.isEmpty()) {
+                    tags = mergeTopSignals(tags,
+                            splitCsvNormalized(firstString(payloadMap.get("tag"))), 10);
+                }
+                if (keywords.isEmpty()) {
+                    keywords = mergeTopSignals(keywords,
+                            splitCsvNormalized(firstString(payloadMap.get("longDes"))), 10);
+                }
+            }
+
+            if (categories.isEmpty() && tags.isEmpty() && keywords.isEmpty()) continue;
+
+            recentEvents.add(new RecentEventSignal(ts, categories, tags, keywords));
+            if (recentEvents.size() >= RECENT_EVENT_KEEP) break;
+        }
+
+        if (recentEvents.isEmpty()) return RecentIntent.empty();
+
+        Map<String, Double> categoryWeights = new HashMap<>();
+        Map<String, Double> tagWeights = new HashMap<>();
+        Map<String, Double> keywordWeights = new HashMap<>();
+
+        for (int i = 0; i < recentEvents.size(); i++) {
+            RecentEventSignal event = recentEvents.get(i);
+            double weight = eventWeightByRecencyIndex(i);
+
+            for (String c : event.categories()) {
+                String normalized = normalizeTag(c);
+                if (normalized != null) categoryWeights.merge(normalized, weight, Double::sum);
+            }
+
+            for (String t : event.tags()) {
+                String normalized = normalizeTag(t);
+                if (normalized != null) tagWeights.merge(normalized, weight, Double::sum);
+            }
+
+            for (String k : event.keywords()) {
+                String normalized = normalizeTag(k);
+                if (normalized != null) keywordWeights.merge(normalized, weight, Double::sum);
+            }
+        }
+
+        return new RecentIntent(recentEvents, categoryWeights, tagWeights, keywordWeights);
+    }
+
+    private static double eventWeightByRecencyIndex(int index) {
+        if (index <= 0) return LATEST_EVENT_WEIGHT;
+        if (index <= 2) return MID_EVENT_WEIGHT;
+        return OLDER_EVENT_WEIGHT;
+    }
+
+    private static double computeRecentIntentMatchScore(List<String> courseTags,
+                                                        String category,
+                                                        Map<String, Object> courseDoc,
+                                                        RecentIntent recentIntent) {
+        if (recentIntent == null || !recentIntent.hasRecentActivity()) return 0d;
+
+        double score = 0d;
+
+        String normalizedCategory = normalizeTag(category);
+        if (normalizedCategory != null) {
+            double categoryWeight = recentIntent.categoryWeights().getOrDefault(normalizedCategory, 0d);
+            score += (categoryWeight * RECENT_CATEGORY_MATCH_SCORE);
+        }
+
+        if (courseTags != null && !courseTags.isEmpty()) {
+            LinkedHashSet<String> uniqueTags = new LinkedHashSet<>();
+            for (String t : courseTags) {
+                String normalizedTag = normalizeTag(t);
+                if (normalizedTag != null) uniqueTags.add(normalizedTag);
+            }
+            for (String tag : uniqueTags) {
+                double tagWeight = recentIntent.tagWeights().getOrDefault(tag, 0d);
+                score += (tagWeight * RECENT_TAG_MATCH_SCORE);
+            }
+        }
+
+        String title = normalizeTextForMatch(firstString(courseDoc.get("title")));
+        String shortDescription = normalizeTextForMatch(firstString(courseDoc.get("shortDescription")));
+        String longDescription = normalizeTextForMatch(firstString(courseDoc.get("longDescription")));
+
+        for (Map.Entry<String, Double> e : recentIntent.keywordWeights().entrySet()) {
+            String kw = e.getKey();
+            if (kw == null || kw.isBlank()) continue;
+            boolean matched = (title != null && title.contains(kw))
+                    || (shortDescription != null && shortDescription.contains(kw))
+                    || (longDescription != null && longDescription.contains(kw));
+            if (matched) {
+                score += (e.getValue() * RECENT_KEYWORD_MATCH_SCORE);
+            }
+        }
+
+        return score;
+    }
+
+    private static long toLongOrDefault(Object raw, long fallback) {
+        if (raw == null) return fallback;
+        try {
+            return Long.parseLong(raw.toString());
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> parsePayloadMap(String payloadRaw) {
+        if (payloadRaw == null || payloadRaw.isBlank()) return Map.of();
+        try {
+            Map<String, Object> parsed = OBJECT_MAPPER.readValue(payloadRaw, new TypeReference<>() {
+            });
+            return parsed == null ? Map.of() : parsed;
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private static List<String> extractKeywordsFromPayload(Object payloadRaw) {
+        Map<String, Object> payload = parsePayloadMap(firstString(payloadRaw));
+        if (payload.isEmpty()) return List.of();
+
+        return mergeTopSignals(
+                splitCsvNormalized(firstString(payload.get("longDes"))),
+                splitCsvNormalized(firstString(payload.get("longDescription"))),
+                20
+        );
     }
 
     private static int countTagMatches(List<Map<String, Object>> candidates, Map<String, Double> tagScore) {
@@ -780,7 +1020,11 @@ public class CourseRecommendationService {
                                        Map<String, Double> categoryScore,
                                        List<String> keywordSignals,
                                        Map<String, Object> courseDoc,
-                                       List<String> lastCourseTags) {
+                                       List<String> lastCourseTags,
+                                       RecentIntent recentIntent,
+                                       double recentRawScore) {
+        if (recentIntent != null && recentIntent.hasRecentActivity() && recentRawScore > 0d) return "recentTopic";
+
         if (courseScore != null && courseScore.containsKey(courseId)) return "courseScore";
 
         if (computeCategoryMatch(category, categoryScore) > 0) return "categoryScore";
@@ -848,12 +1092,55 @@ public class CourseRecommendationService {
     private static int reasonRank(String reason) {
         if (reason == null) return 99;
         return switch (reason) {
-            case "courseScore" -> 1;
-            case "categoryScore" -> 2;
-            case "tagScore" -> 3;
-            case "keywordScore" -> 4;
-            case "lastCourseTags" -> 5;
+            case "recentTopic" -> 1;
+            case "courseScore" -> 2;
+            case "categoryScore" -> 3;
+            case "tagScore" -> 4;
+            case "keywordScore" -> 5;
+            case "lastCourseTags" -> 6;
             default -> 99;
         };
+    }
+
+    private record RecentEventSignal(long timestampMs,
+                                     List<String> categories,
+                                     List<String> tags,
+                                     List<String> keywords) {
+    }
+
+    private record RecentIntent(List<RecentEventSignal> events,
+                                Map<String, Double> categoryWeights,
+                                Map<String, Double> tagWeights,
+                                Map<String, Double> keywordWeights) {
+        static RecentIntent empty() {
+            return new RecentIntent(List.of(), Map.of(), Map.of(), Map.of());
+        }
+
+        boolean hasRecentActivity() {
+            return events != null && !events.isEmpty();
+        }
+
+        List<String> topCategories() {
+            return topSignals(categoryWeights, 20);
+        }
+
+        List<String> topTags() {
+            return topSignals(tagWeights, 20);
+        }
+
+        List<String> topKeywords() {
+            return topSignals(keywordWeights, 20);
+        }
+
+        private static List<String> topSignals(Map<String, Double> weightMap, int limit) {
+            if (weightMap == null || weightMap.isEmpty()) return List.of();
+            return weightMap.entrySet().stream()
+                    .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                    .limit(Math.max(1, limit))
+                    .map(Map.Entry::getKey)
+                    .filter(Objects::nonNull)
+                    .filter(s -> !s.isBlank())
+                    .toList();
+        }
     }
 }
