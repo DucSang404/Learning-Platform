@@ -113,7 +113,18 @@ class CourseUserService {
   }
 
   async getPersonalizationCourse(page = 0, limit = 4): Promise<ApiResponse<Course[]>> {
-    const response = await axiosClient.axiosInstance.get(`/user/recommendations/courses?page=${page}&size=${limit}`)
+    const response = await axiosClient.axiosInstance.get('/user/recommendations/courses', {
+      params: {
+        page,
+        size: limit,
+        _ts: Date.now()
+      },
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0'
+      }
+    })
     return response.data
   }
 

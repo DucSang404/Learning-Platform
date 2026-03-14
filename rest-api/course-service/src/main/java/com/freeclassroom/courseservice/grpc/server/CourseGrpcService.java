@@ -372,6 +372,9 @@ public class CourseGrpcService extends CourseServiceImplBase {
 
             GetCourseTagsResponse response = GetCourseTagsResponse.newBuilder()
                     .addAllTags(tags)
+                    .setCategory(course.getCategory() != null && course.getCategory().getName() != null
+                        ? course.getCategory().getName()
+                        : "")
                     .build();
 
             responseObserver.onNext(response);
