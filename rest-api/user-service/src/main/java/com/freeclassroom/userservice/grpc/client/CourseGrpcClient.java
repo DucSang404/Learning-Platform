@@ -4,6 +4,7 @@ import com.example.grpc.course.GetChartDataRequest;
 import com.example.grpc.course.GetChartDataResponse;
 import com.example.grpc.course.GetCourseAdminDataResponse;
 import com.example.grpc.course.GetCourseAndStudentResponse;
+import com.example.grpc.course.GetCourseRequest;
 import com.example.grpc.course.GetCourseTagsRequest;
 import com.example.grpc.course.GetCourseTagsResponse;
 import com.example.grpc.user.*;
@@ -43,6 +44,13 @@ public class CourseGrpcClient {
                 .setCourseId(courseId == null ? "" : courseId)
                 .build();
         return courseStub.getCourseTags(request);
+    }
+
+    public com.example.grpc.course.CourseResponse getCourseById(String courseId) {
+        GetCourseRequest request = GetCourseRequest.newBuilder()
+                .setId(courseId == null ? "" : courseId)
+                .build();
+        return courseStub.getCourse(request);
     }
 
     public List<com.example.grpc.course.CourseResponse> getBulkCourses(List<String> courseIds) {
