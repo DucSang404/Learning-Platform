@@ -8,6 +8,7 @@ import MultiSelectSearch, { type MultiSelectOption } from '@/components/common/M
 import { Input } from '@/components/ui/input'
 import useLockBodyScroll from '@/hooks/useLockBodyScroll'
 import categoryService from '@/services/course/category.service'
+import eventTracker from '@/services/personalize/eventTracker'
 import tagsService from '@/services/course/tags.service'
 
 export type ExplorePreferencesPayload = {
@@ -216,6 +217,14 @@ export default function ExplorePreferencesModal({
   }, [])
 
   const handleSave = useCallback(() => {
+    void eventTracker
+      .trackingEvent('EXPLORE_PREFERENCES', {
+        category: categories.map((v) => categoryLabelByValue.get(v) ?? v).join(', '),
+        tag: tags.map((v) => tagLabelByValue.get(v) ?? v).join(', '),
+        longDes: parsedKeywords.join(', ')
+      })
+      .catch(() => undefined)
+
     const payload: ExplorePreferencesPayload = {
       categories: categories.map((v) => categoryLabelByValue.get(v) ?? v),
       tags: tags.map((v) => tagLabelByValue.get(v) ?? v),
@@ -259,7 +268,7 @@ export default function ExplorePreferencesModal({
                     onClick={() => onOpenChange(false)}
                     className='absolute right-4 top-4 z-10 rounded-lg p-2 text-modal-text-low transition-colors hover:bg-modal-surface hover:text-modal-text-high'
                   >
-                    <X className='h-5 w-5' />
+                    <X className='h-5 w-5 text-red-600' />
                   </button>
 
                   {/* Header */}

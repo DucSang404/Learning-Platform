@@ -30,11 +30,13 @@ public class CourseRecommendationService {
 
     // scoring weights (normalized 0..1 components)
     // NOTE: weights should sum to ~1.0 for predictability.
-    private static final double W_COURSE_SCORE = 0.35;
-    private static final double W_TAG_MATCH = 0.35;
-    private static final double W_SIMILARITY = 0.20;
-    private static final double W_RECENCY = 0.05;
-    private static final double W_POPULARITY = 0.05;
+    private static final double W_COURSE_SCORE = 0.32;
+    private static final double W_CATEGORY_MATCH = 0.24;
+    private static final double W_TAG_MATCH = 0.18;
+    private static final double W_SIMILARITY = 0.18;
+    private static final double W_ES_RELEVANCE = 0.04;
+    private static final double W_RECENCY = 0.01;
+    private static final double W_POPULARITY = 0.03;
 
     // We want a stable ranking across different `size` values.
     // Always rank from a sufficiently large pool.
@@ -121,9 +123,12 @@ public class CourseRecommendationService {
         Map<String, Double> courseScore = extractCourseScore(source);
         Map<String, Double> tagScoreNormalizedKeys = extractTagScore(source);
         Map<String, Double> tagScoreRawKeys = extractTagScoreRaw(source);
+        Map<String, Double> categoryScoreNormalizedKeys = extractCategoryScore(source);
+        Map<String, Double> categoryScoreRawKeys = extractCategoryScoreRaw(source);
 
         String lastCourseId = extractLastCourseId(source);
         Instant lastSeenAt = extractLastSeenAt(source);
+        List<String> lastCategories = extractLastCategories(source);
 
         List<String> courseScoreIds = courseScore.entrySet().stream()
                 .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
@@ -133,6 +138,11 @@ public class CourseRecommendationService {
                 .toList();
 
         List<String> tagScoreTagsRaw = buildTopTagsForSearch(tagScoreRawKeys, trimTag(preferredTag));
+        List<String> categorySignals = buildTopSignalsForSearch(categoryScoreRawKeys, null);
+
+        if (!lastCategories.isEmpty()) {
+            categorySignals = mergeTopSignals(categorySignals, lastCategories, 20);
+        }
 
         List<String> lastCourseTags = fetchTagsForCourseId(lastCourseId);
         List<String> lastCourseTagsNormalized = lastCourseTags.stream()
@@ -156,6 +166,8 @@ public class CourseRecommendationService {
                 courseScoreIds,
                 tagScoreTagsRaw,
                 lastCourseTags,
+                categorySignals,
+                List.of(),
                 candidateSize,
                 excludeIds,
                 true
@@ -171,6 +183,8 @@ public class CourseRecommendationService {
                         List.of(),
                         tagScoreTagsRaw,
                         List.of(),
+                    categorySignals,
+                        List.of(),
                         extraSize,
                         excludeIds,
                         false
@@ -182,9 +196,10 @@ public class CourseRecommendationService {
         }
 
         double maxPossibleTagMatch = computeMaxPossibleTagMatch(tagScoreNormalizedKeys);
+        double maxPossibleCategoryMatch = computeMaxPossibleCategoryMatch(categoryScoreNormalizedKeys);
         double recencyBase = computeRecencyScore(lastSeenAt, Instant.now());
 
-        double maxCourseScore = computeMaxCourseScore(courseScore);
+        double maxEsScore = computeMaxEsScore(candidateHits);
 
         Map<String, RecommendedCourseItem> byCourseId = new HashMap<>();
 
@@ -194,14 +209,18 @@ public class CourseRecommendationService {
             double popularityScore = 0.5;
             double score = computeFinalScore(
                     List.of(),
+                    null,
                     csId,
                     courseScore,
                     tagScoreNormalizedKeys,
+                    categoryScoreNormalizedKeys,
                     maxPossibleTagMatch,
-                    maxCourseScore,
+                    maxPossibleCategoryMatch,
                     lastCourseTagsNormalized,
                     recencyBase,
-                    popularityScore
+                    popularityScore,
+                    0d,
+                    maxEsScore
             );
             byCourseId.putIfAbsent(csId, RecommendedCourseItem.builder()
                     .courseId(csId)
@@ -215,19 +234,26 @@ public class CourseRecommendationService {
             if (cId == null || cId.isBlank()) continue;
 
             List<String> tags = toStringList(h.get("tags"));
-            String reason = deriveReason(cId, tags, courseScore, tagScoreNormalizedKeys, lastCourseTags);
+            String category = firstString(h.get("category"));
+            double esScore = firstDoubleOrDefault(h.get("_esScore"), 0d);
+            String reason = deriveReason(cId, tags, category,
+                    courseScore, tagScoreNormalizedKeys, categoryScoreNormalizedKeys, lastCourseTags);
 
             double popularityScore = 0.5;
             double score = computeFinalScore(
                     tags,
+                    category,
                     cId,
                     courseScore,
                     tagScoreNormalizedKeys,
+                    categoryScoreNormalizedKeys,
                     maxPossibleTagMatch,
-                    maxCourseScore,
+                    maxPossibleCategoryMatch,
                     lastCourseTagsNormalized,
                     recencyBase,
-                    popularityScore
+                    popularityScore,
+                    esScore,
+                    maxEsScore
             );
 
             RecommendedCourseItem existing = byCourseId.get(cId);
@@ -244,6 +270,8 @@ public class CourseRecommendationService {
         ranked.sort((a, b) -> {
             int cmp = Double.compare(b.getScore(), a.getScore());
             if (cmp != 0) return cmp;
+            int reasonCmp = Integer.compare(reasonRank(a.getReason()), reasonRank(b.getReason()));
+            if (reasonCmp != 0) return reasonCmp;
             return a.getCourseId().compareTo(b.getCourseId());
         });
 
@@ -267,46 +295,50 @@ public class CourseRecommendationService {
     }
 
     /**
-     * finalScore = w_courseScore * courseScore + w_tagMatch * tagMatch + w_similarity * similarity
-     *            + w_recency * recency + w_popularity * popularity
-     * where each component is normalized to 0..1.
+     * finalScore combines normalized behavior signals and retrieval relevance.
      */
     private static double computeFinalScore(List<String> courseTags,
-                                           String courseId,
-                                           Map<String, Double> courseScore,
-                                           Map<String, Double> tagScore,
-                                           double maxPossibleTagMatch,
-                                           double maxCourseScore,
-                                           List<String> lastCourseTagsNormalized,
-                                           double recencyScore,
-                                           double popularityScore) {
+                                            String category,
+                                            String courseId,
+                                            Map<String, Double> courseScore,
+                                            Map<String, Double> tagScore,
+                                            Map<String, Double> categoryScore,
+                                            double maxPossibleTagMatch,
+                                            double maxPossibleCategoryMatch,
+                                            List<String> lastCourseTagsNormalized,
+                                            double recencyScore,
+                                            double popularityScore,
+                                            double esScore,
+                                            double maxEsScore) {
         double rawCourseScore = (courseScore == null || courseId == null) ? 0d : courseScore.getOrDefault(courseId, 0d);
-        double courseScoreNormalized = normalize01(rawCourseScore, maxCourseScore);
+        double courseScoreNormalized = dampenCourseAffinity(rawCourseScore);
 
         double tagMatchSum = computeTagMatchSum(courseTags, tagScore);
         double tagMatchNormalized = normalize01(tagMatchSum, maxPossibleTagMatch);
 
+        double categoryMatchSum = computeCategoryMatch(category, categoryScore);
+        double categoryMatchNormalized = normalize01(categoryMatchSum, maxPossibleCategoryMatch);
+
         double similarity = computeJaccardSimilarity(courseTags, lastCourseTagsNormalized);
+        double esRelevance = normalize01(esScore, maxEsScore);
 
         double recency = clamp01(recencyScore);
         double popularity = clamp01(popularityScore);
 
         double base = (W_COURSE_SCORE * courseScoreNormalized)
                 + (W_TAG_MATCH * tagMatchNormalized)
+                + (W_CATEGORY_MATCH * categoryMatchNormalized)
                 + (W_SIMILARITY * similarity)
+                + (W_ES_RELEVANCE * esRelevance)
                 + (W_RECENCY * recency)
                 + (W_POPULARITY * popularity);
 
         return base;
     }
 
-    private static double computeMaxCourseScore(Map<String, Double> courseScore) {
-        if (courseScore == null || courseScore.isEmpty()) return 1d;
-        return courseScore.values().stream()
-                .filter(Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .max()
-                .orElse(1d);
+    private static double dampenCourseAffinity(double rawCourseScore) {
+        if (rawCourseScore <= 0d) return 0d;
+        return clamp01(rawCourseScore / (rawCourseScore + 4d));
     }
 
     /** Sum tagScore for tags present in the course. */
@@ -335,6 +367,33 @@ public class CourseRecommendationService {
                 .limit(10)
                 .mapToDouble(Double::doubleValue)
                 .sum();
+    }
+
+    private static double computeMaxPossibleCategoryMatch(Map<String, Double> categoryScore) {
+        if (categoryScore == null || categoryScore.isEmpty()) return 1d;
+
+        return categoryScore.values().stream()
+                .sorted(Comparator.reverseOrder())
+                .limit(5)
+                .mapToDouble(Double::doubleValue)
+                .sum();
+    }
+
+    private static double computeCategoryMatch(String category, Map<String, Double> categoryScore) {
+        if (categoryScore == null || categoryScore.isEmpty()) return 0d;
+        String normalized = normalizeTag(category);
+        if (normalized == null) return 0d;
+        return categoryScore.getOrDefault(normalized, 0d);
+    }
+
+    private static double computeMaxEsScore(List<Map<String, Object>> candidateHits) {
+        if (candidateHits == null || candidateHits.isEmpty()) return 1d;
+        double max = 0d;
+        for (Map<String, Object> h : candidateHits) {
+            double score = firstDoubleOrDefault(h.get("_esScore"), 0d);
+            if (score > max) max = score;
+        }
+        return max <= 0d ? 1d : max;
     }
 
     /** Similarity between candidate tags and last course tags (0..1). */
@@ -450,6 +509,65 @@ public class CourseRecommendationService {
     }
 
     @SuppressWarnings("unchecked")
+    private Map<String, Double> extractCategoryScore(Map<String, Object> source) {
+        if (source == null) return Map.of();
+
+        Map<String, Double> categoryScore = new HashMap<>();
+        Object catObj = source.get("categoryScore");
+        if (catObj instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+
+                String category = normalizeTag(firstString(m.get("category")));
+                Double sc = firstDouble(m.get("score"));
+                if (category == null || sc == null) continue;
+                categoryScore.put(category, sc);
+            }
+        }
+        return categoryScore;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Double> extractCategoryScoreRaw(Map<String, Object> source) {
+        if (source == null) return Map.of();
+
+        Map<String, Double> categoryScore = new HashMap<>();
+        Object catObj = source.get("categoryScore");
+        if (catObj instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+
+                String category = trimTag(firstString(m.get("category")));
+                Double sc = firstDouble(m.get("score"));
+                if (category == null || sc == null) continue;
+                categoryScore.put(category, sc);
+            }
+        }
+        return categoryScore;
+    }
+
+    private static List<String> extractLastCategories(Map<String, Object> source) {
+        return extractLastActionSignal(source, "lastCategory");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> extractLastActionSignal(Map<String, Object> source, String key) {
+        if (source == null || key == null || key.isBlank()) return List.of();
+
+        Object v = source.get("lastAction." + key);
+        if (v != null) {
+            return splitCsvNormalized(firstString(v));
+        }
+
+        Object lastAction = source.get("lastAction");
+        if (lastAction instanceof Map<?, ?> m) {
+            return splitCsvNormalized(firstString(m.get(key)));
+        }
+
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
     private static String extractLastCourseId(Map<String, Object> source) {
         if (source == null) return null;
 
@@ -506,6 +624,8 @@ public class CourseRecommendationService {
                 List.of(courseId),
                 List.of(),
                 List.of(),
+            List.of(),
+            List.of(),
                 1,
                 List.of(),
                 false
@@ -527,6 +647,36 @@ public class CourseRecommendationService {
                 });
 
         return new ArrayList<>(out);
+    }
+
+    private static List<String> buildTopSignalsForSearch(Map<String, Double> scoreMap, String preferred) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (preferred != null && !preferred.isBlank()) out.add(preferred);
+        if (scoreMap == null || scoreMap.isEmpty()) return new ArrayList<>(out);
+
+        scoreMap.entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                .limit(20)
+                .forEach(e -> {
+                    if (e.getKey() != null && !e.getKey().isBlank()) out.add(e.getKey());
+                });
+
+        return new ArrayList<>(out);
+    }
+
+    private static List<String> mergeTopSignals(List<String> primary, List<String> secondary, int limit) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (primary != null) out.addAll(primary);
+        if (secondary != null) {
+            for (String s : secondary) {
+                if (s == null || s.isBlank()) continue;
+                out.add(s);
+                if (out.size() >= limit) break;
+            }
+        }
+
+        if (out.size() <= limit) return new ArrayList<>(out);
+        return new ArrayList<>(out).subList(0, limit);
     }
 
     private static String extractCourseIdFromCourseDoc(Map<String, Object> courseSource) {
@@ -562,6 +712,23 @@ public class CourseRecommendationService {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static double firstDoubleOrDefault(Object v, double defaultValue) {
+        Double d = firstDouble(v);
+        return d == null ? defaultValue : d;
+    }
+
+    private static List<String> splitCsvNormalized(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        String[] parts = raw.split(",");
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        for (String p : parts) {
+            if (p == null) continue;
+            String normalized = normalizeTag(p);
+            if (normalized != null) out.add(normalized);
+        }
+        return new ArrayList<>(out);
     }
 
     private static List<String> toStringList(Object v) {
@@ -604,11 +771,15 @@ public class CourseRecommendationService {
     }
 
     private static String deriveReason(String courseId,
-                                      List<String> tags,
-                                      Map<String, Double> courseScore,
-                                      Map<String, Double> tagScore,
-                                      List<String> lastCourseTags) {
+                                       List<String> tags,
+                                       String category,
+                                       Map<String, Double> courseScore,
+                                       Map<String, Double> tagScore,
+                                       Map<String, Double> categoryScore,
+                                       List<String> lastCourseTags) {
         if (courseScore != null && courseScore.containsKey(courseId)) return "courseScore";
+
+        if (computeCategoryMatch(category, categoryScore) > 0) return "categoryScore";
 
         double tagRel = computeTagMatchSum(tags, tagScore);
         if (tagRel > 0) return "tagScore";
@@ -621,5 +792,16 @@ public class CourseRecommendationService {
         }
 
         return "popular";
+    }
+
+    private static int reasonRank(String reason) {
+        if (reason == null) return 99;
+        return switch (reason) {
+            case "courseScore" -> 1;
+            case "categoryScore" -> 2;
+            case "tagScore" -> 3;
+            case "lastCourseTags" -> 4;
+            default -> 99;
+        };
     }
 }

@@ -33,6 +33,8 @@ public class CourseIndexService {
             Collection<String> courseScoreIds,
             Collection<String> tagScoreTags,
             Collection<String> lastCourseTags,
+            Collection<String> categorySignals,
+            Collection<String> keywordSignals,
             int size,
             Collection<String> excludeCourseIds,
             boolean includePopularFallback
@@ -48,6 +50,8 @@ public class CourseIndexService {
 
         addTagsShouldClauses(should, tagScoreTags, 3);
         addTagsShouldClauses(should, lastCourseTags, 2);
+        addCategoryShouldClauses(should, categorySignals, 3);
+        addKeywordShouldClauses(should, keywordSignals, 2);
 
         if (includePopularFallback) {
             // If you later add a popularity field, replace this with a function_score.
@@ -63,7 +67,7 @@ public class CourseIndexService {
         Map<String, Object> body = Map.of(
                 "size", size,
                 "track_total_hits", false,
-                "_source", List.of("id", "tags"),
+            "_source", List.of("id", "tags", "category", "title", "longDescription", "shortDescription"),
                 "query", Map.of(
                         "bool", Map.of(
                                 "should", should,
@@ -92,7 +96,12 @@ public class CourseIndexService {
                 if (!(h instanceof Map<?, ?> hm)) continue;
                 Object srcObj = hm.get("_source");
                 if (srcObj instanceof Map<?, ?> src) {
-                    out.add((Map<String, Object>) src);
+                    Map<String, Object> row = new HashMap<>((Map<String, Object>) src);
+                    Object esScore = hm.get("_score");
+                    if (esScore instanceof Number n) {
+                        row.put("_esScore", n.doubleValue());
+                    }
+                    out.add(row);
                 }
             }
             return out;
@@ -111,6 +120,30 @@ public class CourseIndexService {
         for (String t : tags) {
             if (t == null || t.isBlank()) continue;
             should.add(Map.of("match_phrase", Map.of("tags", Map.of("query", t, "boost", boost))));
+        }
+    }
+
+    private static void addCategoryShouldClauses(List<Object> should, Collection<String> categories, int boost) {
+        if (categories == null || categories.isEmpty()) return;
+
+        should.add(Map.of("terms", Map.of("category.keyword", categories, "boost", boost + 1)));
+
+        for (String c : categories) {
+            if (c == null || c.isBlank()) continue;
+            should.add(Map.of("match_phrase", Map.of("category", Map.of("query", c, "boost", boost))));
+        }
+    }
+
+    private static void addKeywordShouldClauses(List<Object> should, Collection<String> keywords, int boost) {
+        if (keywords == null || keywords.isEmpty()) return;
+
+        for (String kw : keywords) {
+            if (kw == null || kw.isBlank()) continue;
+            should.add(Map.of("multi_match", Map.of(
+                    "query", kw,
+                    "fields", List.of("title^2", "shortDescription", "longDescription"),
+                    "boost", boost
+            )));
         }
     }
 }

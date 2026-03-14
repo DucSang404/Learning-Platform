@@ -151,6 +151,32 @@ public class RedisToElasticsearchSyncJob {
             }
         }
 
+        // categoryScore
+        Set<ZSetOperations.TypedTuple<String>> categoryTuples = redis.opsForZSet().reverseRangeWithScores(categoryScoreKey(prefix, subjectId), 0, 29);
+        List<Map<String, Object>> categoryScore = new ArrayList<>();
+        if (categoryTuples != null) {
+            for (var t : categoryTuples) {
+                if (t == null || t.getValue() == null || t.getScore() == null) continue;
+                categoryScore.add(Map.of(
+                        "category", t.getValue(),
+                        "score", t.getScore()
+                ));
+            }
+        }
+
+        // keywordScore
+        Set<ZSetOperations.TypedTuple<String>> keywordTuples = redis.opsForZSet().reverseRangeWithScores(keywordScoreKey(prefix, subjectId), 0, 39);
+        List<Map<String, Object>> keywordScore = new ArrayList<>();
+        if (keywordTuples != null) {
+            for (var t : keywordTuples) {
+                if (t == null || t.getValue() == null || t.getScore() == null) continue;
+                keywordScore.add(Map.of(
+                        "keyword", t.getValue(),
+                        "score", t.getScore()
+                ));
+            }
+        }
+
         // lastAction
         Map<Object, Object> last = redis.opsForHash().entries(lastActionKey(prefix, subjectId));
         Map<String, Object> lastAction = new HashMap<>();
@@ -159,6 +185,8 @@ public class RedisToElasticsearchSyncJob {
             putIfNotBlank(lastAction, "lastEventName", toString(last.get("last_event_name")));
             putIfNotBlank(lastAction, "lastCourseId", toString(last.get("last_course_id")));
             putIfNotBlank(lastAction, "lastTag", toString(last.get("last_tag")));
+            putIfNotBlank(lastAction, "lastCategory", toString(last.get("last_category")));
+            putIfNotBlank(lastAction, "lastLongDes", toString(last.get("last_long_des")));
         }
 
         Map<String, Object> doc = new HashMap<>();
@@ -167,6 +195,8 @@ public class RedisToElasticsearchSyncJob {
         doc.put("updatedAt", nowMs);
         doc.put("courseScore", courseScore);
         doc.put("tagScore", tagScore);
+        doc.put("categoryScore", categoryScore);
+        doc.put("keywordScore", keywordScore);
         doc.put("lastAction", lastAction);
         return doc;
     }
@@ -198,6 +228,14 @@ public class RedisToElasticsearchSyncJob {
 
     private String tagScoreKey(String prefix, String subjectId) {
         return prefix + subjectId + ":tag_score";
+    }
+
+    private String categoryScoreKey(String prefix, String subjectId) {
+        return prefix + subjectId + ":category_score";
+    }
+
+    private String keywordScoreKey(String prefix, String subjectId) {
+        return prefix + subjectId + ":keyword_score";
     }
 
     private String lastActionKey(String prefix, String subjectId) {

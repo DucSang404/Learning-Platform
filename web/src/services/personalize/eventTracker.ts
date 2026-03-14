@@ -1,7 +1,7 @@
 import axiosClient from '@/lib/axiosClient.lib'
 
 class EventTrackerService {
-  async trackingEvent(eventName: string, courseId?: string) {
+  async trackingEvent(eventName: string, payloadOrCourseId?: Record<string, string> | string) {
     const data: {
       eventName: string
       payload?: Record<string, string>
@@ -9,11 +9,16 @@ class EventTrackerService {
       eventName
     }
 
-    if (courseId) {
+    if (typeof payloadOrCourseId === 'string' && payloadOrCourseId) {
       data.payload = {
-        courseId
+        courseId: payloadOrCourseId
       }
     }
+
+    if (payloadOrCourseId && typeof payloadOrCourseId !== 'string') {
+      data.payload = payloadOrCourseId
+    }
+
     const response = await axiosClient.axiosInstance.post('user/track-event', data)
     return response.data
   }
