@@ -2,6 +2,36 @@ import csv
 import os
 import re
 import random
+from googletrans import Translator
+
+translator = Translator(service_urls=['translate.googleapis.com'])
+_translation_cache = {}
+
+
+def translate_to_vietnamese(text):
+    """Translate given text to Vietnamese, with caching and graceful fallback."""
+    if not text:
+        return ''
+
+    normalized = text.strip()
+    if not normalized:
+        return ''
+
+    cached = _translation_cache.get(normalized)
+    if cached is not None:
+        return cached
+
+    try:
+        translated = translator.translate(normalized, dest='vi')
+        translated_text = translated.text.strip()
+        if not translated_text:
+            translated_text = normalized
+    except Exception as exc:
+        print(f"Warning: Unable to translate title '{normalized}': {exc}")
+        translated_text = normalized
+
+    _translation_cache[normalized] = translated_text
+    return translated_text
 
 def parse_rating(rating_str):
     """
@@ -66,7 +96,9 @@ def clean_courses(input_file, output_file):
                             val = ''
                         
                         # Transformations
-                        if output_col == 'rating':
+                        if output_col == 'title':
+                            val = translate_to_vietnamese(val)
+                        elif output_col == 'rating':
                             val = parse_rating(val)
                         elif output_col == 'instructors':
                              if val:
