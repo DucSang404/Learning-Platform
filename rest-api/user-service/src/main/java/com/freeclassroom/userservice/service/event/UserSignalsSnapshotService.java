@@ -21,6 +21,14 @@ public class UserSignalsSnapshotService {
         return subjectPrefix + subjectId + ":tag_score";
     }
 
+    public String categoryScoreKey(String subjectPrefix, String subjectId) {
+        return subjectPrefix + subjectId + ":category_score";
+    }
+
+    public String keywordScoreKey(String subjectPrefix, String subjectId) {
+        return subjectPrefix + subjectId + ":keyword_score";
+    }
+
     public String lastActionKey(String subjectPrefix, String subjectId) {
         return subjectPrefix + subjectId + ":last_action";
     }
@@ -60,6 +68,34 @@ public class UserSignalsSnapshotService {
             }
         }
 
+        // categoryScore
+        Set<ZSetOperations.TypedTuple<String>> categoryTuples = redis.opsForZSet()
+                .reverseRangeWithScores(categoryScoreKey(subjectPrefix, subjectId), 0, 29);
+        List<Map<String, Object>> categoryScore = new ArrayList<>();
+        if (categoryTuples != null) {
+            for (var t : categoryTuples) {
+                if (t == null || t.getValue() == null || t.getScore() == null) continue;
+                categoryScore.add(Map.of(
+                        "category", t.getValue(),
+                        "score", t.getScore()
+                ));
+            }
+        }
+
+        // keywordScore
+        Set<ZSetOperations.TypedTuple<String>> keywordTuples = redis.opsForZSet()
+                .reverseRangeWithScores(keywordScoreKey(subjectPrefix, subjectId), 0, 39);
+        List<Map<String, Object>> keywordScore = new ArrayList<>();
+        if (keywordTuples != null) {
+            for (var t : keywordTuples) {
+                if (t == null || t.getValue() == null || t.getScore() == null) continue;
+                keywordScore.add(Map.of(
+                        "keyword", t.getValue(),
+                        "score", t.getScore()
+                ));
+            }
+        }
+
         // lastAction
         Map<Object, Object> last = redis.opsForHash().entries(lastActionKey(subjectPrefix, subjectId));
         Map<String, Object> lastAction = new HashMap<>();
@@ -68,6 +104,8 @@ public class UserSignalsSnapshotService {
             putString(lastAction, "lastEventName", last.get("last_event_name"));
             putString(lastAction, "lastCourseId", last.get("last_course_id"));
             putString(lastAction, "lastTag", last.get("last_tag"));
+            putString(lastAction, "lastCategory", last.get("last_category"));
+            putString(lastAction, "lastLongDes", last.get("last_long_des"));
         }
 
         Map<String, Object> doc = new HashMap<>();
@@ -76,6 +114,8 @@ public class UserSignalsSnapshotService {
         doc.put("updatedAt", nowMs);
         doc.put("courseScore", courseScore);
         doc.put("tagScore", tagScore);
+        doc.put("categoryScore", categoryScore);
+        doc.put("keywordScore", keywordScore);
         doc.put("lastAction", lastAction);
         return doc;
     }

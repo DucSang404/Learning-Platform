@@ -51,8 +51,10 @@ public class AuthenticationController {
     }
 
     @PostMapping("oauth2/google")
-    ApiResponse<AuthResponse> outBoundAuthentication(@RequestParam("code") String code) throws JOSEException {
-        return authenticationService.oauth2GoogleAuth(code);
+    ApiResponse<AuthResponse> outBoundAuthentication(@RequestParam("code") String code, HttpServletRequest request) throws JOSEException {
+        Identity identity = (Identity) request.getAttribute("IDENTITY");
+
+        return authenticationService.oauth2GoogleAuth(code, identity);
     }
 
     @PostMapping("forgot-password")

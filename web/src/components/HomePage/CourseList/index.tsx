@@ -8,9 +8,10 @@ import eventTracker from '@/services/personalize/eventTracker'
 interface CourseListProps {
   title: string
   fetcher: () => Promise<any>
+  refreshKey?: number
 }
 
-const CourseList = ({ title, fetcher }: CourseListProps) => {
+const CourseList = ({ title, fetcher, refreshKey = 0 }: CourseListProps) => {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [finalTitle, setFinalTitle] = useState(title)
@@ -35,7 +36,7 @@ const CourseList = ({ title, fetcher }: CourseListProps) => {
     }
 
     loadCourses()
-  }, [fetcher, title])
+  }, [fetcher, title, refreshKey])
 
   if (loading) {
     return (

@@ -120,5 +120,6 @@ message GetCourseTagsRequest {
 
 message GetCourseTagsResponse {
   repeated string tags = 1;
+  string category = 2;
 }
 

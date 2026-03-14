@@ -1,6 +1,8 @@
 import csv
 import os
+import sys
 from datetime import datetime
+from pathlib import Path
 try:
     from pymongo import MongoClient
     from bson.objectid import ObjectId
@@ -9,19 +11,16 @@ except ImportError:
     print("Please install it by running: pip install pymongo")
     exit(1)
 
-# Database Configuration
-def load_env(env_file):
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                if line.strip() and not line.startswith('#'):
-                    key, value = line.strip().split('=', 1)
-                    os.environ[key] = value.strip().strip("'").strip('"')
+SCRIPT_ROOT = Path(__file__).resolve().parents[1]
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from utils import load_env
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.abspath(os.path.join(script_dir, '..', '..'))
 env_path = os.path.join(data_dir, '.env')
-load_env(env_path)
+load_env([env_path])
 
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
 # Using notification-service as default since Feedback model is there

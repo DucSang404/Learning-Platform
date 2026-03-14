@@ -54,12 +54,28 @@ public class TrackingEventIndexService {
                                                         "score", Map.of("type", "double")
                                                 )
                                         ),
+                                        "categoryScore", Map.of(
+                                            "type", "nested",
+                                            "properties", Map.of(
+                                                "category", Map.of("type", "keyword"),
+                                                "score", Map.of("type", "double")
+                                            )
+                                        ),
+                                        "keywordScore", Map.of(
+                                            "type", "nested",
+                                            "properties", Map.of(
+                                                "keyword", Map.of("type", "keyword"),
+                                                "score", Map.of("type", "double")
+                                            )
+                                        ),
                                         "lastAction", Map.of(
                                                 "properties", Map.of(
                                                         "lastSeenAtMs", Map.of("type", "date", "format", "epoch_millis"),
                                                         "lastEventName", Map.of("type", "keyword"),
                                                         "lastCourseId", Map.of("type", "keyword"),
-                                                        "lastTag", Map.of("type", "keyword")
+                                                "lastTag", Map.of("type", "keyword"),
+                                                "lastCategory", Map.of("type", "keyword"),
+                                                "lastLongDes", Map.of("type", "keyword")
                                                 )
                                         )
                                 )

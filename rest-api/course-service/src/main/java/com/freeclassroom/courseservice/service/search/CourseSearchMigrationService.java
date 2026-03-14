@@ -1,4 +1,4 @@
-package com.freeclassroom.courseservice.search;
+package com.freeclassroom.courseservice.service.search;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
@@ -6,6 +6,7 @@ import co.elastic.clients.elasticsearch._types.mapping.Property;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
+import com.freeclassroom.courseservice.dto.search.CourseEsDocument;
 import com.freeclassroom.courseservice.entity.course.CourseEntity;
 import com.freeclassroom.courseservice.repository.entity.CourseRepository;
 import lombok.RequiredArgsConstructor;
@@ -92,7 +93,20 @@ public class CourseSearchMigrationService {
                 .index(indexName)
                 .mappings(m -> m
                         .properties("id", Property.of(p -> p.keyword(k -> k)))
-                        .properties("tags", Property.of(p -> p.keyword(k -> k)))
+                        .properties("title", Property.of(p -> p.text(t -> t.fields("keyword", k -> k.keyword(kk -> kk.ignoreAbove(256))))))
+                        .properties("shortDescription", Property.of(p -> p.text(t -> t)))
+                        .properties("longDescription", Property.of(p -> p.text(t -> t)))
+                        .properties("thumbnailUrl", Property.of(p -> p.keyword(k -> k)))
+                        .properties("introductoryVideo", Property.of(p -> p.keyword(k -> k)))
+                        .properties("language", Property.of(p -> p.keyword(k -> k)))
+                        .properties("originalPrice", Property.of(p -> p.double_(d -> d)))
+                        .properties("finalPrice", Property.of(p -> p.double_(d -> d)))
+                        .properties("rating", Property.of(p -> p.double_(d -> d)))
+                        .properties("instructorId", Property.of(p -> p.keyword(k -> k)))
+                        .properties("category", Property.of(p -> p.text(t -> t.fields("keyword", k -> k.keyword(kk -> kk.ignoreAbove(256))))))
+                        .properties("createdAt", Property.of(p -> p.date(d -> d)))
+                        .properties("status", Property.of(p -> p.keyword(k -> k)))
+                        .properties("deleted", Property.of(p -> p.boolean_(b -> b)))
                 )
         );
         log.info("Elasticsearch index '{}' created (fresh).", indexName);
@@ -109,7 +123,20 @@ public class CourseSearchMigrationService {
                 .index(indexName)
                 .mappings(m -> m
                         .properties("id", Property.of(p -> p.keyword(k -> k)))
-                        .properties("tags", Property.of(p -> p.keyword(k -> k)))
+                        .properties("title", Property.of(p -> p.text(t -> t.fields("keyword", k -> k.keyword(kk -> kk.ignoreAbove(256))))))
+                        .properties("shortDescription", Property.of(p -> p.text(t -> t)))
+                        .properties("longDescription", Property.of(p -> p.text(t -> t)))
+                        .properties("thumbnailUrl", Property.of(p -> p.keyword(k -> k)))
+                        .properties("introductoryVideo", Property.of(p -> p.keyword(k -> k)))
+                        .properties("language", Property.of(p -> p.keyword(k -> k)))
+                        .properties("originalPrice", Property.of(p -> p.double_(d -> d)))
+                        .properties("finalPrice", Property.of(p -> p.double_(d -> d)))
+                        .properties("rating", Property.of(p -> p.double_(d -> d)))
+                        .properties("instructorId", Property.of(p -> p.keyword(k -> k)))
+                        .properties("category", Property.of(p -> p.text(t -> t.fields("keyword", k -> k.keyword(kk -> kk.ignoreAbove(256))))))
+                        .properties("createdAt", Property.of(p -> p.date(d -> d)))
+                        .properties("status", Property.of(p -> p.keyword(k -> k)))
+                        .properties("deleted", Property.of(p -> p.boolean_(b -> b)))
                 )
         );
         log.info("Elasticsearch index '{}' created.", indexName);
@@ -131,16 +158,22 @@ public class CourseSearchMigrationService {
         List<BulkOperation> operations = new ArrayList<>(courses.size());
 
         for (CourseEntity course : courses) {
-            // Avoid NPE and keep predictable payload.
-            List<String> tagNames = course.getTags() == null ? List.of() : course.getTags().stream()
-                    .filter(t -> t != null && t.getName() != null)
-                    .map(t -> t.getName())
-                    .distinct()
-                    .toList();
-
-            CourseSearchDocument doc = CourseSearchDocument.builder()
+            CourseEsDocument doc = CourseEsDocument.builder()
                     .id(course.getId())
-                    .tags(tagNames)
+                    .title(course.getTitle())
+                    .shortDescription(course.getShortDescription())
+                    .longDescription(course.getLongDescription())
+                    .thumbnailUrl(course.getThumbnailUrl())
+                    .introductoryVideo(course.getIntroductoryVideo())
+                    .language(course.getLanguage())
+                    .originalPrice(course.getOriginalPrice())
+                    .finalPrice(course.getFinalPrice())
+                    .rating(course.getRating())
+                    .instructorId(course.getInstructorId())
+                    .category(course.getCategory() != null ? course.getCategory().getName() : null)
+                    .createdAt(course.getCreatedAt())
+                    .status(course.getStatus() != null ? course.getStatus().name() : null)
+                    .deleted(course.getDeleted())
                     .build();
 
             operations.add(BulkOperation.of(o -> o
@@ -159,7 +192,6 @@ public class CourseSearchMigrationService {
         try {
             return elasticsearchClient.bulk(request);
         } catch (ElasticsearchException ex) {
-            // Re-throw as IOException so caller can decide fail-fast.
             throw new IOException("Elasticsearch bulk indexing failed: " + ex.getMessage(), ex);
         }
     }
