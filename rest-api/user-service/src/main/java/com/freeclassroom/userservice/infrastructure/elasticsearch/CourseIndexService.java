@@ -116,6 +116,18 @@ public class CourseIndexService {
         // Use 'terms' for keyword arrays; more efficient and correct for the mapping created by migration.
         should.add(Map.of("terms", Map.of("tags", tags, "boost", boost)));
 
+        // Fallback for case differences (signals are normalized to lowercase in event ingestion).
+        for (String t : tags) {
+            if (t == null || t.isBlank()) continue;
+            should.add(Map.of("term", Map.of(
+                    "tags", Map.of(
+                            "value", t,
+                            "boost", boost,
+                            "case_insensitive", true
+                    )
+            )));
+        }
+
         // Backup for deployments where tags might be text. Keep it low-risk.
         for (String t : tags) {
             if (t == null || t.isBlank()) continue;

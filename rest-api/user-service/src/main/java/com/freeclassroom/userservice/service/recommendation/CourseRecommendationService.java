@@ -125,6 +125,7 @@ public class CourseRecommendationService {
         Map<String, Double> tagScoreRawKeys = extractTagScoreRaw(source);
         Map<String, Double> categoryScoreNormalizedKeys = extractCategoryScore(source);
         Map<String, Double> categoryScoreRawKeys = extractCategoryScoreRaw(source);
+        Map<String, Double> keywordScoreRawKeys = extractKeywordScoreRaw(source);
 
         String lastCourseId = extractLastCourseId(source);
         Instant lastSeenAt = extractLastSeenAt(source);
@@ -139,6 +140,7 @@ public class CourseRecommendationService {
 
         List<String> tagScoreTagsRaw = buildTopTagsForSearch(tagScoreRawKeys, trimTag(preferredTag));
         List<String> categorySignals = buildTopSignalsForSearch(categoryScoreRawKeys, null);
+        List<String> keywordSignals = buildTopSignalsForSearch(keywordScoreRawKeys, null);
 
         if (!lastCategories.isEmpty()) {
             categorySignals = mergeTopSignals(categorySignals, lastCategories, 20);
@@ -167,7 +169,7 @@ public class CourseRecommendationService {
                 tagScoreTagsRaw,
                 lastCourseTags,
                 categorySignals,
-                List.of(),
+            keywordSignals,
                 candidateSize,
                 excludeIds,
                 true
@@ -184,7 +186,7 @@ public class CourseRecommendationService {
                         tagScoreTagsRaw,
                         List.of(),
                     categorySignals,
-                        List.of(),
+                    keywordSignals,
                         extraSize,
                         excludeIds,
                         false
@@ -237,7 +239,7 @@ public class CourseRecommendationService {
             String category = firstString(h.get("category"));
             double esScore = firstDoubleOrDefault(h.get("_esScore"), 0d);
             String reason = deriveReason(cId, tags, category,
-                    courseScore, tagScoreNormalizedKeys, categoryScoreNormalizedKeys, lastCourseTags);
+                    courseScore, tagScoreNormalizedKeys, categoryScoreNormalizedKeys, keywordSignals, h, lastCourseTags);
 
             double popularityScore = 0.5;
             double score = computeFinalScore(
@@ -776,6 +778,8 @@ public class CourseRecommendationService {
                                        Map<String, Double> courseScore,
                                        Map<String, Double> tagScore,
                                        Map<String, Double> categoryScore,
+                                       List<String> keywordSignals,
+                                       Map<String, Object> courseDoc,
                                        List<String> lastCourseTags) {
         if (courseScore != null && courseScore.containsKey(courseId)) return "courseScore";
 
@@ -783,6 +787,8 @@ public class CourseRecommendationService {
 
         double tagRel = computeTagMatchSum(tags, tagScore);
         if (tagRel > 0) return "tagScore";
+
+        if (hasKeywordMatch(courseDoc, keywordSignals)) return "keywordScore";
 
         if (lastCourseTags != null && !lastCourseTags.isEmpty() && tags != null) {
             for (String t : tags) {
@@ -794,13 +800,59 @@ public class CourseRecommendationService {
         return "popular";
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Double> extractKeywordScoreRaw(Map<String, Object> source) {
+        if (source == null) return Map.of();
+
+        Map<String, Double> keywordScore = new HashMap<>();
+        Object kwObj = source.get("keywordScore");
+        if (kwObj instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+
+                String keyword = trimTag(firstString(m.get("keyword")));
+                Double sc = firstDouble(m.get("score"));
+                if (keyword == null || sc == null) continue;
+                keywordScore.put(keyword, sc);
+            }
+        }
+        return keywordScore;
+    }
+
+    private static boolean hasKeywordMatch(Map<String, Object> courseDoc, List<String> keywordSignals) {
+        if (courseDoc == null || keywordSignals == null || keywordSignals.isEmpty()) return false;
+
+        String title = normalizeTextForMatch(firstString(courseDoc.get("title")));
+        String shortDescription = normalizeTextForMatch(firstString(courseDoc.get("shortDescription")));
+        String longDescription = normalizeTextForMatch(firstString(courseDoc.get("longDescription")));
+
+        for (String kw : keywordSignals) {
+            String normalizedKw = normalizeTextForMatch(kw);
+            if (normalizedKw == null || normalizedKw.isBlank()) continue;
+            if ((title != null && title.contains(normalizedKw))
+                    || (shortDescription != null && shortDescription.contains(normalizedKw))
+                    || (longDescription != null && longDescription.contains(normalizedKw))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static String normalizeTextForMatch(String raw) {
+        if (raw == null) return null;
+        String out = raw.trim().toLowerCase(Locale.ROOT);
+        return out.isBlank() ? null : out;
+    }
+
     private static int reasonRank(String reason) {
         if (reason == null) return 99;
         return switch (reason) {
             case "courseScore" -> 1;
             case "categoryScore" -> 2;
             case "tagScore" -> 3;
-            case "lastCourseTags" -> 4;
+            case "keywordScore" -> 4;
+            case "lastCourseTags" -> 5;
             default -> 99;
         };
     }

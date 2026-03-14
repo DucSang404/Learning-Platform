@@ -69,6 +69,7 @@ export default function ExplorePreferencesModal({
   const [tagOptions, setTagOptions] = useState<MultiSelectOption[]>(initialCachedTagOptions)
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [isLoadingTags, setIsLoadingTags] = useState(initialCachedTagOptions.length === 0)
+  const [isSaving, setIsSaving] = useState(false)
   const [categoryError, setCategoryError] = useState('')
   const [tagError, setTagError] = useState('')
   const [keywordError, setKeywordError] = useState('')
@@ -216,14 +217,20 @@ export default function ExplorePreferencesModal({
     setKeywordError('')
   }, [])
 
-  const handleSave = useCallback(() => {
-    void eventTracker
-      .trackingEvent('EXPLORE_PREFERENCES', {
+  const handleSave = useCallback(async () => {
+    if (isSaving) return
+
+    setIsSaving(true)
+
+    try {
+      await eventTracker.trackingEvent('EXPLORE_PREFERENCES', {
         category: categories.map((v) => categoryLabelByValue.get(v) ?? v).join(', '),
         tag: tags.map((v) => tagLabelByValue.get(v) ?? v).join(', '),
         longDes: parsedKeywords.join(', ')
       })
-      .catch(() => undefined)
+    } catch {
+      // still continue to close and refresh; backend can be retried on next interaction
+    }
 
     const payload: ExplorePreferencesPayload = {
       categories: categories.map((v) => categoryLabelByValue.get(v) ?? v),
@@ -232,7 +239,10 @@ export default function ExplorePreferencesModal({
     }
     onSave?.(payload)
     onOpenChange(false)
-  }, [categories, categoryLabelByValue, parsedKeywords, onOpenChange, onSave, tagLabelByValue, tags])
+    setIsSaving(false)
+  }, [categories, categoryLabelByValue, isSaving, parsedKeywords, onOpenChange, onSave, tagLabelByValue, tags])
+
+  const isSaveDisabled = allSelections.length === 0 || isSaving
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -445,6 +455,8 @@ export default function ExplorePreferencesModal({
                         className='text-white hover:text-green-500'
                         label='Lưu sở thích'
                         onClick={handleSave}
+                        disabled={isSaveDisabled}
+                        isLoader={isSaving}
                       />
                     </div>
                   </div>
