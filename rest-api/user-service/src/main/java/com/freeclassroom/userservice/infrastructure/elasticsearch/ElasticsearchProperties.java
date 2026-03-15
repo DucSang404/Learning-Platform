@@ -1,6 +1,7 @@
 package com.freeclassroom.userservice.infrastructure.elasticsearch;
 
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
@@ -14,9 +15,11 @@ public class ElasticsearchProperties {
     @Data
     public static class Index {
         /** Index for user personalization signals (course_score, tag_score, last_action). */
-        private String trackingEvents = "user-personalization-signals-dev";
+        @Value("${elasticsearch.index.tracking-events:user-personalization-signals}")
+        private String trackingEvents;
 
         /** Index for courses catalog (courseId + tags). */
-        private String courses = "courses-dev";
+        @Value("${elasticsearch.index.courses:courses}")
+        private String courses;
     }
 }
