@@ -1,5 +1,6 @@
 import App from './App'
 import ReactDOM from 'react-dom/client'
+import 'rsuite/dist/rsuite-no-reset.min.css'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import DefaultLayout from './layouts/DefaultLayout'
