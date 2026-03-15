@@ -1,4 +1,4 @@
-package com.freeclassroom.courseservice.search;
+package com.freeclassroom.courseservice.dto.search;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;

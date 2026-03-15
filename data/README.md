@@ -41,6 +41,7 @@ Raw data is collected from various sources (e.g., CSV dumps).
 Selects relevant columns, parses ratings, adds default values (prices, thumbnails, video URLs), and renames columns.
 *   **Script:** `scripts/clean/clean_online_courses.py`
 *   **Output:** `data/cleaned/cleaned_courses.csv`
+*   **Note:** Set `DEEPL_API_KEY` (or `DEEPL_AUTH_KEY`) in `.env` to enable automatic Vietnamese title translation via Deepl.
 
 ### 3. Normalize
 Splits the cleaned data into relational entities, generates UUIDs, and creates mock data (users, chapters, lessons).
@@ -105,6 +106,11 @@ DB_PORT=3306
 # MongoDB Config
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB_NAME=blog-service
+
+# Deepl Translation (used in clean_online_courses)
+DEEPL_API_KEY=your_deepl_api_key
+# or alternatively
+# DEEPL_AUTH_KEY=your_deepl_api_key
 ```
 
 ### 3. Run Full Pipeline
