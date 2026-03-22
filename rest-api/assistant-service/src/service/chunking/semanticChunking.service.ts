@@ -1,7 +1,7 @@
 
 import { DocumentLoader } from "~/service/chunking/documentLoader.service";
 import { SentenceProcessor } from "~/service/chunking/sentenceProcessor.service";
-import { EmbeddingE5Service } from "~/service/chunking/embeddingE5.service";
+import { EmbeddingE5Service } from "~/service/embedding/embeddingE5.service";
 import { SemanticAnalyzer } from "~/service/chunking/semanticAnalyzer.service";
 import { SemanticChunk } from "~/service/chunking/types";
 

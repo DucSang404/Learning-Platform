@@ -8,6 +8,7 @@ import { LessonEvent } from '~/enums/lessonEvents.enum';
 import { LessonAnalysisEvents } from '~/service/events/lessonAnalysis.events';
 import { TranscriptSavedPayload } from '~/dto/event/lesson-analysis-events.dto';
 import { SemanticChunkingService } from '~/service/chunking/semanticChunking.service';
+import { EmbeddingE5Service } from '~/service/embedding/embeddingE5.service';
 import { LessonAnalysisEvent } from '~/dto/request/lesson-analysis.dto';
 import { SummaryService } from '~/service/analysis/summary.service';
 
@@ -23,8 +24,13 @@ class LessonAnalysisService {
         this.documentService = new DocumentService();
         this.emitter = new EventEmitter();
 
-        // Wire all lesson event listeners (chunking pipeline, summarization, logging, etc.)
-        new LessonAnalysisEvents(this.emitter, new SemanticChunkingService(), new SummaryService());
+        // Wire all lesson event listeners (chunking pipeline, summarization, embeddings, logging, etc.)
+        new LessonAnalysisEvents(
+            this.emitter,
+            new SemanticChunkingService(),
+            new SummaryService(),
+            new EmbeddingE5Service()
+        );
     }
 
     public static getInstance(): LessonAnalysisService {
