@@ -62,7 +62,7 @@ export class LessonRAGService {
             );
 
             // Step 1: Search for relevant chunks
-            const chunks = await searchService.searchChunks(lessonId, question, 2);
+            const chunks = await searchService.searchChunks(lessonId, question, 3);
 
             if (chunks.length === 0) {
                 Logger.warn(

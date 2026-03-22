@@ -38,6 +38,6 @@ analysisRouter.patch('/lessons/:lessonId/chunks/:chunkId/summary', Authenticatio
  * 
  * Body: { "question": "User's question about the lesson" }
  */
-analysisRouter.post('/lessons/:lessonId/chat', Authentication(true), checkLessonOwnership, validateDto(RAGQuestionRequest), analysisController.answerQuestion)
+analysisRouter.post('/lessons/:lessonId/chat', validateDto(RAGQuestionRequest), analysisController.answerQuestion)
 
 export default analysisRouter
