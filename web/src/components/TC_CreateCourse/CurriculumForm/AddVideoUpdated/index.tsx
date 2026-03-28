@@ -9,6 +9,7 @@ import Step1MediaUpload from './Step1MediaUpload'
 import Step2DetailsForm from './Step2DetailsForm'
 import Step0TypeSelection from './Step0TypeSelection'
 import { useAnalysis } from '@/hooks/useAnalysis.hook'
+import { useChunkedUpload } from '@/hooks/useChunkedUpload.hook'
 
 import { MultiUploadItem } from '@/hooks/useMultiUpload'
 import lessonService from '@/services/course/lesson.service'
@@ -67,20 +68,11 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
   const [contentType, setContentType] = useState<'video' | 'document'>(mode === 'edit' ? initialType : 'video')
   const [step, setStep] = useState<0 | 1 | 2>(mode === 'edit' ? 2 : 0)
 
-  // Track the upload ID for this specific form instance
-  const [currentUploadId, setCurrentUploadId] = useState<string | null>(null)
-
-  // Find the upload item in the list
-  const currentUpload = uploads.find((u) => u.id === currentUploadId)
-  const isUploading = currentUpload?.status === 'uploading'
-  const uploadProgress = currentUpload?.progress || 0
-
-  // Derived: lessonId returned by backend SSE 'completed' event { lessonId: '...' }
-  // Reading directly from currentUpload.data (reactive via uploads prop) to avoid
-  // useState/useEffect batching timing issues.
-  const createdLessonId: string | undefined = currentUpload?.data?.lessonId
-  // Effective lessonId: edit mode uses prop, create mode uses SSE response
-  const effectiveLessonId = lessonId ?? createdLessonId
+  // Use new chunked upload hook
+  const chunkedUpload = useChunkedUpload()
+  
+  // Effective lesson ID: edit mode uses prop, create mode uses SSE response
+  const effectiveLessonId = lessonId ?? chunkedUpload.lesson?.lessonId
 
   // TODO: replace with real auth check
   const isVip = true
@@ -170,48 +162,53 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
   }
 
   // Continue editing: Start upload but keep modal open and move to step 2
-  const handleContinueEditing = () => {
+  const handleContinueEditing = async () => {
     if (!selectedFile) return
 
-    // If already uploading, do nothing else
-    if (currentUploadId) {
-      setStep(2) // If already uploading, just move to step 2
+    // If already uploading, just move to step 2
+    if (chunkedUpload.isUploading) {
+      setStep(2)
       return
     }
 
-    const currentTitle = watch('title')
-    const currentContent = watch('content')
+    try {
+      startLoading()
+      
+      const currentTitle = watch('title')
+      const currentContent = watch('content')
+      const duration = watch('duration')
 
-    const submitData: CreationLessonFormValues = {
-      title: currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
-      content: currentContent || '',
-      isPublic: false,
-      duration: watch('duration')
-    }
+      // Step 1: Initialize upload session
+      const uploadInitResult = await chunkedUpload.startUpload(selectedFile, {
+        chapterId,
+        title: currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
+        content: currentContent || '',
+        isPublic: watch('isPublic'),
+        duration: duration ?? undefined,
+        position: 1,
+        chunkSize: 10 * 1024 * 1024 // 10MB default
+      })
 
-    // Prepare FormData manually since we are bypassing handleAddLesson's default behavior
-    const formData = new FormData()
-    formData.append(
-      'lesson',
-      new Blob(
-        [
-          JSON.stringify({
-            title: submitData.title,
-            content: submitData.content,
-            isPublic: submitData.isPublic,
-            duration: submitData.duration,
-            chapterId: chapterId
-          })
-        ],
-        { type: 'application/json' }
+      // Step 2: Upload all chunks - returns etags
+      const uploadedEtags = await chunkedUpload.uploadChunks(uploadInitResult.sessionId, uploadInitResult.chunks)
+
+      // Step 3: Complete upload (SSE) - pass etags directly
+      const result = await chunkedUpload.completeUpload(
+        uploadInitResult.sessionId,
+        uploadedEtags,
+        currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
+        currentContent,
+        duration ?? undefined
       )
-    )
-    // formData.append('file', selectedFile)
 
-    // Start upload and store ID
-    const uri = contentType === 'video' ? 'learning/lessons/video' : 'learning/lessons/article'
-    const id = startUpload(selectedFile, formData, submitData.title, uri, false)
-    setCurrentUploadId(id)
+      // Move to step 2 after upload completes
+      setStep(2)
+      toast.success('Upload hoàn tất')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Upload thất bại')
+    } finally {
+      stopLoading()
+    }
   }
 
   // for step 2 - update metadata form
@@ -244,10 +241,10 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
   }
 
   useEffect(() => {
-    if (currentUploadId && currentUpload?.status === 'done' && step === 1) {
+    if (chunkedUpload.isUploading && chunkedUpload.progress === 100 && step === 1) {
       setStep(2)
     }
-  }, [currentUploadId, currentUpload?.status, step])
+  }, [chunkedUpload.isUploading, chunkedUpload.progress, step])
 
   return (
     <div className='w-full h-full bg-gray-50 flex flex-col'>
@@ -366,8 +363,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                 setStep={setStep}
                 onQuickSave={handleQuickSave}
                 onContinueEditing={handleContinueEditing}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
+                isUploading={chunkedUpload.isUploading}
+                uploadProgress={chunkedUpload.progress}
                 contentType={contentType}
               />
             )}
@@ -382,8 +379,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                 watch={watch}
                 setValue={setValue}
                 errors={errors}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
+                isUploading={chunkedUpload.isUploading}
+                uploadProgress={chunkedUpload.progress}
                 handleSubmit={handleSubmit}
                 handleUpdateLesson={handleUpdateLesson}
                 contentType={contentType}
