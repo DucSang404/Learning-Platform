@@ -3,6 +3,7 @@ import analysisController from '~/controllers/analysis.controller'
 
 import Authentication from '~/middleware/auth.midleware'
 import { checkLessonOwnership } from '~/middleware/checkLessonOwnership.middleware'
+import { checkViewLesson } from '~/middleware/checkViewLesson.middleware'
 import validateDto from '~/middleware/validateDto.midleware'
 import { UpdateChunkSummaryDto } from '~/dto/request/update-chunk.dto'
 import { RAGQuestionRequest } from '~/dto/request/ragQuestion.dto'
@@ -31,13 +32,21 @@ analysisRouter.patch('/lessons/:lessonId/chunks/:chunkId/summary', Authenticatio
  * Answer a question about lesson content using RAG (Retrieval-Augmented Generation).
  * 
  * Workflow:
- * 1. Search for relevant chunks by semantic similarity
- * 2. Format chunks as context
- * 3. Send to LLM with question
- * 4. Return answer + source references
+ * 1. Verify user is authenticated
+ * 2. Verify user is enrolled in course (can view lesson)
+ * 3. Search for relevant chunks by semantic similarity
+ * 4. Format chunks as context
+ * 5. Send to LLM with question
+ * 6. Return answer + source references
  * 
  * Body: { "question": "User's question about the lesson" }
  */
-analysisRouter.post('/lessons/:lessonId/chat', validateDto(RAGQuestionRequest), analysisController.answerQuestion)
+analysisRouter.post(
+    '/lessons/:lessonId/chat',
+    Authentication(true),
+    checkViewLesson,
+    validateDto(RAGQuestionRequest),
+    analysisController.answerQuestion
+)
 
 export default analysisRouter
