@@ -175,22 +175,21 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
       // Step 2: Upload all chunks using uploadId
       const uploadedEtags = await chunkedUpload.uploadChunks(newUploadId)
 
-      // Step 3: Complete upload (SSE) - pass uploadId and metadata
+      // Step 3: Complete upload - pass uploadId, fileType, and metadata
       const result = await chunkedUpload.completeUpload(
         newUploadId,
+        'video', // fileType: 'video' for this component
         currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
         currentContent,
         duration ?? undefined
       )
 
-      // Store lesson ID in upload data for reference
-      const uploadItem = chunkedUpload.uploads.find((u) => u.id === newUploadId)
-      if (uploadItem) {
-        uploadItem.data = { lessonId: result.lessonId }
-      }
+      // Store lesson ID in upload data for reference (triggers state update)
+      chunkedUpload.updateUploadData(newUploadId, { lessonId: result.id })
 
       // Move to step 2 after upload completes
       setStep(2)
+
       toast.success('Upload hoàn tất')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Upload thất bại')

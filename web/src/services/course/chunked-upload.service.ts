@@ -75,130 +75,23 @@ class ChunkedUploadService {
   }
 
   /**
-   * Step 4: Complete the multipart upload (SSE stream)
-   * Yields progress events: 'saving_db' and 'completed'
+   * Step 4: Complete the multipart upload (JSON response)
+   * Returns the created lesson data
    */
   async completeUpload(
     sessionId: string,
-    request: CompleteUploadRequest,
-    onEvent?: (event: { type: string; data: any }) => void
+    request: CompleteUploadRequest
   ): Promise<CompleteUploadResponse> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        // Get the authorization token
-        const token = axiosAuthUtils.getAccessToken()
-        const baseURL = axiosClient.axiosInstance.defaults.baseURL
-
-        // Use fetch for SSE stream with proper headers
-        const response = await fetch(`${baseURL}/${this.baseUrl}/sessions/${sessionId}/complete`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` })
-          },
-          body: JSON.stringify(request),
-          credentials: 'include'
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`HTTP ${response.status}: ${errorText}`)
-        }
-
-        if (!response.body) {
-          throw new Error('No response body received')
-        }
-
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let completedReceived = false
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-
-          // Split by double newline to get complete SSE messages
-          const messages = buffer.split('\n\n')
-          
-          // Keep the last incomplete message in buffer
-          buffer = messages[messages.length - 1]
-
-          // Process all complete messages
-          for (let i = 0; i < messages.length - 1; i++) {
-            const message = messages[i].trim()
-            if (!message) continue
-
-            const lines = message.split('\n')
-            let eventType = ''
-            let eventData = ''
-
-            // Parse event and data lines
-            for (const line of lines) {
-              if (line.startsWith('event:')) {
-                eventType = line.substring('event:'.length).trim()
-              } else if (line.startsWith('data:')) {
-                eventData = line.substring('data:'.length).trim()
-              }
-            }
-
-            // Emit event if we have both type and data
-            if (eventType && eventData) {
-              try {
-                const data = JSON.parse(eventData)
-                onEvent?.({ type: eventType, data })
-
-                if (eventType === 'completed') {
-                  completedReceived = true
-                  resolve(data)
-                  return
-                }
-              } catch (e) {
-                // Silently ignore parse errors
-              }
-            }
-          }
-        }
-
-        // Handle remaining buffer if stream ended
-        if (buffer.trim()) {
-          const lines = buffer.trim().split('\n')
-          let eventType = ''
-          let eventData = ''
-
-          for (const line of lines) {
-            if (line.startsWith('event:')) {
-              eventType = line.substring('event:'.length).trim()
-            } else if (line.startsWith('data:')) {
-              eventData = line.substring('data:'.length).trim()
-            }
-          }
-
-          if (eventType && eventData) {
-            try {
-              const data = JSON.parse(eventData)
-              onEvent?.({ type: eventType, data })
-
-              if (eventType === 'completed') {
-                completedReceived = true
-                resolve(data)
-                return
-              }
-            } catch (e) {
-              // Silently ignore parse errors
-            }
-          }
-        }
-
-        if (!completedReceived) {
-          reject(new Error('SSE stream ended without completed event'))
-        }
-      } catch (error) {
-        reject(error)
-      }
-    })
+    const response = await axiosClient.axiosInstance.post<ApiResponse<CompleteUploadResponse>>(
+      `${this.baseUrl}/sessions/${sessionId}/complete`,
+      request
+    )
+    
+    if (!response.data.result) {
+      throw new Error(response.data.message || 'Failed to complete upload')
+    }
+    
+    return response.data.result
   }
 
   /**
