@@ -1,6 +1,7 @@
 package com.freeclassroom.courseservice.entity.course;
 
 import com.freeclassroom.courseservice.entity.AbstractEntity;
+import com.freeclassroom.courseservice.enums.entity.EnumLessonType;
 import com.freeclassroom.courseservice.enums.entity.EnumLessonUploadStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -60,9 +61,11 @@ public class LessonUploadSessionEntity extends AbstractEntity {
     Integer totalParts;
 
     @Enumerated(EnumType.STRING)
+    EnumLessonType fileType;
+
+    @Enumerated(EnumType.STRING)
     EnumLessonUploadStatus status;
 
     LocalDateTime expiresAt;
     LocalDateTime completedAt;
 }
-

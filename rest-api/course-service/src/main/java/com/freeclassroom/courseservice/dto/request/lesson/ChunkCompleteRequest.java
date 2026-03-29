@@ -1,7 +1,9 @@
 package com.freeclassroom.courseservice.dto.request.lesson;
 
+import com.freeclassroom.courseservice.enums.entity.EnumLessonType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -22,10 +24,12 @@ public class ChunkCompleteRequest {
     @Size(max = 10000)
     List<@Valid ChunkUploadPartRequest> parts;
 
+    @NotNull
+    EnumLessonType fileType;
+
     String title;
     String content;
     Long duration;
     Long position;
     Boolean isPublic;
 }
-

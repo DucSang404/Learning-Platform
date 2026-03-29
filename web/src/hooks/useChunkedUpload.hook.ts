@@ -1,6 +1,6 @@
 /**
- * Hook for managing chunked video upload lifecycle (multi-file)
- * Handles: initialization, chunking, presign requests, S3 uploads, and SSE completion
+ * Hook for managing chunked video/article upload lifecycle (multi-file)
+ * Handles: initialization, chunking, presign requests, S3 uploads, and JSON completion
  * Compatible with UploadProgress component for displaying multiple file uploads
  */
 
@@ -289,14 +289,18 @@ export function useChunkedUpload() {
   )
 
   /**
-   * Complete upload via SSE stream
+   * Complete upload via JSON response (v2 API)
+   * Requires fileType parameter to specify 'video' or 'article'
    */
   const completeUpload = useCallback(
     async (
       uploadId: string,
+      fileType: 'video' | 'article',
       title?: string,
       content?: string,
-      duration?: number
+      duration?: number,
+      position?: number,
+      isPublic?: boolean
     ): Promise<CompleteUploadResponse> => {
       const session = sessionsRef.current.get(uploadId)
       if (!session || !session.sessionId) {
@@ -323,27 +327,24 @@ export function useChunkedUpload() {
             etag // etag is already quoted from S3
           }))
 
-        // Complete upload with SSE
-        const response = await chunkedUploadService.completeUpload(
-          sessionId,
-          { parts, title, content, duration },
-          (event) => {
-            if (event.type === 'saving_db') {
-              upsert(uploadId, {
-                progress: 98,
-                message: 'Đang lưu thông tin bài giảng...'
-              })
-            } else if (event.type === 'completed') {
-              upsert(uploadId, {
-                progress: 100,
-                status: 'done',
-                message: 'Hoàn tất'
-              })
-            }
-          }
-        )
+        // Complete upload with JSON response
+        const response = await chunkedUploadService.completeUpload(sessionId, {
+          parts,
+          title,
+          content,
+          duration,
+          position,
+          isPublic,
+          fileType
+        })
 
         session.lessonData = response
+
+        upsert(uploadId, {
+          progress: 100,
+          status: 'done',
+          message: 'Hoàn tất'
+        })
 
         return response
       } catch (error) {
