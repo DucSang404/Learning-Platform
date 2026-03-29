@@ -70,11 +70,7 @@ public class AmazonS3Client {
     }
 
     private String generateFileName(String originalFileName) {
-        return new Date().getTime() + "-" + sanitizeFileName(originalFileName);
-    }
-
-    private String sanitizeFileName(String originalFileName) {
-        return originalFileName.replace(" ", "_");
+        return new Date().getTime() + "-" + fileUtils.toAsciiFileName(originalFileName);
     }
 
     private CompletableFuture<PutObjectResponse> uploadFileTos3bucket(String key, File file) {

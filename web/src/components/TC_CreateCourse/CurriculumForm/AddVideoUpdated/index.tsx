@@ -11,7 +11,6 @@ import Step0TypeSelection from './Step0TypeSelection'
 import { useAnalysis } from '@/hooks/useAnalysis.hook'
 import { useChunkedUpload } from '@/hooks/useChunkedUpload.hook'
 
-import { MultiUploadItem } from '@/hooks/useMultiUpload'
 import lessonService from '@/services/course/lesson.service'
 import { toast } from 'sonner'
 import useLoading from '@/hooks/useLoading.hook'
@@ -20,10 +19,8 @@ import { Upload, ArrowRight, ArrowLeft, X, Trash2 } from 'lucide-react'
 interface AddVideoFormProps {
   lessonId?: string
   chapterId: string
-  handleAddLesson?: HandleAddLesson
   setOpen: React.Dispatch<React.SetStateAction<boolean>>
-  uploads?: MultiUploadItem[]
-  startUpload?: (file: File, fd: FormData, titlePost: string, uri: string, isCallCallback: boolean) => string
+  chunkedUpload: ReturnType<typeof useChunkedUpload>
   fetchChapters: () => Promise<void>
   initialData?: Lesson
   mode?: 'create' | 'edit'
@@ -34,10 +31,8 @@ interface AddVideoFormProps {
 const AddVideoForm: React.FC<AddVideoFormProps> = ({
   lessonId,
   chapterId,
-  handleAddLesson,
   setOpen,
-  uploads = [],
-  startUpload = () => '',
+  chunkedUpload,
   fetchChapters,
   initialData,
   mode = 'create',
@@ -63,16 +58,17 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
   const { loading, startLoading, stopLoading } = useLoading()
   const [videoSrc, setVideoSrc] = useState<string | null>(initialData?.url || null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadId, setUploadId] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [contentType, setContentType] = useState<'video' | 'document'>(mode === 'edit' ? initialType : 'video')
   const [step, setStep] = useState<0 | 1 | 2>(mode === 'edit' ? 2 : 0)
 
-  // Use new chunked upload hook
-  const chunkedUpload = useChunkedUpload()
-  
-  // Effective lesson ID: edit mode uses prop, create mode uses SSE response
-  const effectiveLessonId = lessonId ?? chunkedUpload.lesson?.lessonId
+  // Find current upload being processed
+  const currentUpload = uploadId ? chunkedUpload.uploads.find((u) => u.id === uploadId) : null
+
+  // Effective lesson ID: edit mode uses prop, or fetch from current upload's data
+  const effectiveLessonId = lessonId ?? currentUpload?.data?.lessonId
 
   // TODO: replace with real auth check
   const isVip = true
@@ -141,24 +137,9 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
     }
   }
 
-  // Quick save: Upload and close modal
-  const handleQuickSave = () => {
-    if (!selectedFile) return
-
-    const currentTitle = watch('title')
-    const currentContent = watch('content')
-
-    const submitData: CreationLessonFormValues = {
-      title: currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
-      content: currentContent || '',
-      isPublic: false,
-      duration: watch('duration')
-    }
-
-    if (handleAddLesson) {
-      const uri = contentType === 'video' ? 'learning/lessons/video' : 'learning/lessons/article'
-      handleAddLesson(selectedFile, chapterId, handleCloseForm, uri)(submitData)
-    }
+  // Quick save: Upload using chunked upload
+  const handleQuickSave = async () => {
+    handleContinueEditing()
   }
 
   // Continue editing: Start upload but keep modal open and move to step 2
@@ -166,7 +147,7 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
     if (!selectedFile) return
 
     // If already uploading, just move to step 2
-    if (chunkedUpload.isUploading) {
+    if (currentUpload && currentUpload.status === 'uploading') {
       setStep(2)
       return
     }
@@ -178,8 +159,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
       const currentContent = watch('content')
       const duration = watch('duration')
 
-      // Step 1: Initialize upload session
-      const uploadInitResult = await chunkedUpload.startUpload(selectedFile, {
+      // Step 1: Initialize upload session - returns uploadId
+      const newUploadId = await chunkedUpload.startUpload(selectedFile, {
         chapterId,
         title: currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
         content: currentContent || '',
@@ -189,17 +170,24 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
         chunkSize: 10 * 1024 * 1024 // 10MB default
       })
 
-      // Step 2: Upload all chunks - returns etags
-      const uploadedEtags = await chunkedUpload.uploadChunks(uploadInitResult.sessionId, uploadInitResult.chunks)
+      setUploadId(newUploadId)
 
-      // Step 3: Complete upload (SSE) - pass etags directly
+      // Step 2: Upload all chunks using uploadId
+      const uploadedEtags = await chunkedUpload.uploadChunks(newUploadId)
+
+      // Step 3: Complete upload (SSE) - pass uploadId and metadata
       const result = await chunkedUpload.completeUpload(
-        uploadInitResult.sessionId,
-        uploadedEtags,
+        newUploadId,
         currentTitle || selectedFile.name || 'Bài giảng chưa có tiêu đề',
         currentContent,
         duration ?? undefined
       )
+
+      // Store lesson ID in upload data for reference
+      const uploadItem = chunkedUpload.uploads.find((u) => u.id === newUploadId)
+      if (uploadItem) {
+        uploadItem.data = { lessonId: result.lessonId }
+      }
 
       // Move to step 2 after upload completes
       setStep(2)
@@ -241,10 +229,10 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
   }
 
   useEffect(() => {
-    if (chunkedUpload.isUploading && chunkedUpload.progress === 100 && step === 1) {
+    if (currentUpload && currentUpload.progress === 100 && currentUpload.status === 'done' && step === 1) {
       setStep(2)
     }
-  }, [chunkedUpload.isUploading, chunkedUpload.progress, step])
+  }, [currentUpload, step])
 
   return (
     <div className='w-full h-full bg-gray-50 flex flex-col'>
@@ -332,12 +320,10 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
         <div className='max-w-4xl mx-auto'>
           <form
             onSubmit={handleSubmit(async (data) => {
-              if (mode === 'edit' && handleUpdateLesson) {
+              // For both create and edit modes, if we have an effectiveLessonId, update the lesson metadata
+              if (effectiveLessonId && handleUpdateLesson) {
                 await handleUpdateLesson(data)
                 handleCloseForm(false)
-              } else if (handleAddLesson && selectedFile) {
-                const uri = contentType === 'video' ? 'learning/lessons/video' : 'learning/lessons/article'
-                await handleAddLesson(selectedFile, chapterId, handleCloseForm, uri)(data)
               }
             })}
             className='w-full'
@@ -363,8 +349,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                 setStep={setStep}
                 onQuickSave={handleQuickSave}
                 onContinueEditing={handleContinueEditing}
-                isUploading={chunkedUpload.isUploading}
-                uploadProgress={chunkedUpload.progress}
+                isUploading={currentUpload?.status === 'uploading'}
+                uploadProgress={currentUpload?.progress ?? 0}
                 contentType={contentType}
               />
             )}
@@ -379,8 +365,8 @@ const AddVideoForm: React.FC<AddVideoFormProps> = ({
                 watch={watch}
                 setValue={setValue}
                 errors={errors}
-                isUploading={chunkedUpload.isUploading}
-                uploadProgress={chunkedUpload.progress}
+                isUploading={currentUpload?.status === 'uploading'}
+                uploadProgress={currentUpload?.progress ?? 0}
                 handleSubmit={handleSubmit}
                 handleUpdateLesson={handleUpdateLesson}
                 contentType={contentType}
