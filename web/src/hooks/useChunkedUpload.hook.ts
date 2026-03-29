@@ -1,6 +1,7 @@
 /**
- * Hook for managing chunked video upload lifecycle
+ * Hook for managing chunked video upload lifecycle (multi-file)
  * Handles: initialization, chunking, presign requests, S3 uploads, and SSE completion
+ * Compatible with UploadProgress component for displaying multiple file uploads
  */
 
 import { useState, useCallback, useRef } from 'react'
@@ -13,6 +14,7 @@ import {
   FileChunk
 } from '@/utils/upload/file-chunking.util'
 import { InitUploadRequest, CompleteUploadResponse } from '@/types/chunked-upload.type'
+import { MultiUploadItem } from '@/hooks/useMultiUpload'
 
 const ERROR_CODES = {
   SESSION_NOT_FOUND: 'LESSON_UPLOAD_SESSION_NOT_FOUND',
@@ -56,60 +58,78 @@ function extractErrorMessage(error: any): string {
   return 'Có lỗi xảy ra. Vui lòng thử lại.'
 }
 
-export interface UseChunkedUploadState {
+/**
+ * Internal session data per upload
+ */
+interface SessionData {
   sessionId: string | null
-  fileName: string | null
+  fileName: string
   totalSize: number
   uploadedSize: number
-  progress: number
-  isUploading: boolean
-  isCompleting: boolean
-  error: string | null
-  lesson: CompleteUploadResponse | null
   chunks: FileChunk[]
-  uploadedEtags: Map<number, string> // part number -> etag
-}
-
-const initialState: UseChunkedUploadState = {
-  sessionId: null,
-  fileName: null,
-  totalSize: 0,
-  uploadedSize: 0,
-  progress: 0,
-  isUploading: false,
-  isCompleting: false,
-  error: null,
-  lesson: null,
-  chunks: [],
-  uploadedEtags: new Map()
+  uploadedEtags: Map<number, string>
+  abortController: AbortController | null
+  lessonData: CompleteUploadResponse | null
 }
 
 export function useChunkedUpload() {
-  const [state, setState] = useState<UseChunkedUploadState>(initialState)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const [uploads, setUploads] = useState<MultiUploadItem[]>([])
+  const sessionsRef = useRef<Map<string, SessionData>>(new Map())
+
+  /**
+   * Upsert an upload item in the uploads array
+   */
+  const upsert = useCallback((id: string, patch: Partial<MultiUploadItem>) => {
+    setUploads((prev) => {
+      const idx = prev.findIndex((p) => p.id === id)
+      if (idx === -1) {
+        const item: MultiUploadItem = {
+          id,
+          fileName: patch.fileName ?? 'unknown',
+          progress: patch.progress ?? 0,
+          message: patch.message ?? '',
+          status: patch.status ?? 'idle',
+          title: patch.title ?? ''
+        }
+        return [item, ...prev]
+      }
+      const next = [...prev]
+      next[idx] = { ...next[idx], ...patch }
+      return next
+    })
+  }, [])
 
   /**
    * Initialize upload: split file, init session, prepare chunks
+   * Returns upload ID for tracking
    */
   const startUpload = useCallback(
-    async (file: File, initRequest: Omit<InitUploadRequest, 'fileSize' | 'fileName' | 'contentType'>) => {
+    async (
+      file: File,
+      initRequest: Omit<InitUploadRequest, 'fileSize' | 'fileName' | 'contentType'>
+    ) => {
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
       try {
-        setState((prev) => ({
-          ...prev,
-          isUploading: true,
-          error: null
-        }))
+        // Create upload item
+        upsert(uploadId, {
+          id: uploadId,
+          fileName: file.name,
+          progress: 0,
+          message: 'Đang chuẩn bị tệp...',
+          status: 'uploading',
+          title: initRequest.title || file.name
+        })
 
         // Step 1: Split file into chunks
         const chunkingResult = await splitFileIntoChunks(file, initRequest.chunkSize)
 
-        setState((prev) => ({
-          ...prev,
-          fileName: file.name,
-          totalSize: file.size,
-          chunks: chunkingResult.chunks
-        }))
+        upsert(uploadId, {
+          progress: 10,
+          message: 'Đang tải lên chunks...'
+        })
 
+        // Step 2: Initialize session
         const initResponse = await chunkedUploadService.initUpload({
           ...initRequest,
           fileSize: file.size,
@@ -123,38 +143,55 @@ export function useChunkedUpload() {
         }
 
         const sessionData = initResponse.result!
-        setState((prev) => ({
-          ...prev,
-          sessionId: sessionData.sessionId
-        }))
 
-        return { sessionId: sessionData.sessionId, chunks: chunkingResult.chunks }
+        // Store session data
+        sessionsRef.current.set(uploadId, {
+          sessionId: sessionData.sessionId,
+          fileName: file.name,
+          totalSize: file.size,
+          uploadedSize: 0,
+          chunks: chunkingResult.chunks,
+          uploadedEtags: new Map(),
+          abortController: null,
+          lessonData: null
+        })
+
+        return uploadId
       } catch (error) {
         const errorMsg = extractErrorMessage(error)
-        setState((prev) => ({
-          ...prev,
-          error: errorMsg,
-          isUploading: false
-        }))
+        upsert(uploadId, {
+          status: 'error',
+          message: errorMsg,
+          progress: 0
+        })
         toast.error(errorMsg)
         throw error
       }
     },
-    []
+    [upsert]
   )
 
   /**
-   * Upload all chunks with presigned URLs
+   * Upload all chunks for a specific upload session
    * Returns the Map of part numbers to ETags for use in completeUpload
    */
   const uploadChunks = useCallback(
-    async (sessionId: string, chunks: FileChunk[]): Promise<Map<number, string>> => {
+    async (uploadId: string): Promise<Map<number, string>> => {
+      const session = sessionsRef.current.get(uploadId)
+      if (!session || !session.sessionId) {
+        throw new Error('Upload session not found')
+      }
+
+      const { sessionId, chunks, totalSize } = session
+
       if (!sessionId || chunks.length === 0) {
         throw new Error('Invalid session or no chunks to upload')
       }
 
       try {
-        abortControllerRef.current = new AbortController()
+        const abortController = new AbortController()
+        session.abortController = abortController
+
         const etags = new Map<number, string>()
         let uploadedSize = 0
 
@@ -164,7 +201,7 @@ export function useChunkedUpload() {
 
         // Upload chunks in batches
         for (const batch of batches) {
-          if (abortControllerRef.current?.signal.aborted) {
+          if (abortController.signal.aborted) {
             throw new Error('Upload cancelled')
           }
 
@@ -180,7 +217,7 @@ export function useChunkedUpload() {
           const concurrency = 3
 
           for (let i = 0; i < presignedParts.length; i += concurrency) {
-            if (abortControllerRef.current?.signal.aborted) {
+            if (abortController.signal.aborted) {
               throw new Error('Upload cancelled')
             }
 
@@ -205,61 +242,78 @@ export function useChunkedUpload() {
               uploadedSize += chunk.size
 
               // Update progress
-              setState((prev) => ({
-                ...prev,
-                uploadedSize,
-                progress: calculateProgress(uploadedSize, prev.totalSize)
-              }))
+              const progress = 10 + calculateProgress(uploadedSize, totalSize) * 0.8 // 10-90%
+              upsert(uploadId, {
+                progress: Math.round(progress),
+                message: `Tải lên ${Math.round((uploadedSize / totalSize) * 100)}%`
+              })
             })
 
             await Promise.all(uploadPromises)
           }
         }
 
-        setState((prev) => ({
-          ...prev,
-          uploadedEtags: etags,
-          uploadedSize: prev.totalSize, // Ensure progress is 100%
-          progress: 100
-        }))
+        session.uploadedEtags = etags
+        session.uploadedSize = totalSize
+
+        upsert(uploadId, {
+          progress: 90,
+          message: 'Hoàn tất chunks, đang xác nhận...'
+        })
 
         // Return etags for immediate use in completeUpload
         return etags
       } catch (error) {
         const errorMsg = extractErrorMessage(error)
-        setState((prev) => ({
-          ...prev,
-          error: errorMsg,
-          isUploading: false
-        }))
+        
+        // Auto-abort session on error
+        const session = sessionsRef.current.get(uploadId)
+        if (session && session.sessionId) {
+          try {
+            await chunkedUploadService.abortUpload(session.sessionId)
+          } catch (abortErr) {
+            console.error('Failed to abort session:', abortErr)
+          }
+        }
+        
+        upsert(uploadId, {
+          status: 'error',
+          message: errorMsg,
+          progress: 0
+        })
         toast.error(errorMsg)
         throw error
       }
     },
-    []
+    [upsert]
   )
 
   /**
    * Complete upload via SSE stream
-   * Accepts uploadedEtags as parameter to avoid race conditions with state closure
    */
   const completeUpload = useCallback(
     async (
-      sessionId: string,
-      uploadedEtags: Map<number, string>,
+      uploadId: string,
       title?: string,
       content?: string,
       duration?: number
-    ) => {
+    ): Promise<CompleteUploadResponse> => {
+      const session = sessionsRef.current.get(uploadId)
+      if (!session || !session.sessionId) {
+        throw new Error('Upload session not found')
+      }
+
+      const { sessionId, uploadedEtags } = session
+
       if (!sessionId || uploadedEtags.size === 0) {
         throw new Error('Invalid session or no chunks uploaded')
       }
 
       try {
-        setState((prev) => ({
-          ...prev,
-          isCompleting: true
-        }))
+        upsert(uploadId, {
+          progress: 95,
+          message: 'Đang hoàn tất upload...'
+        })
 
         // Prepare parts in ascending order
         const parts = Array.from(uploadedEtags.entries())
@@ -275,104 +329,110 @@ export function useChunkedUpload() {
           { parts, title, content, duration },
           (event) => {
             if (event.type === 'saving_db') {
-              toast.loading('Đang lưu thông tin bài giảng...')
+              upsert(uploadId, {
+                progress: 98,
+                message: 'Đang lưu thông tin bài giảng...'
+              })
             } else if (event.type === 'completed') {
-              toast.success('Bài giảng đã tải lên thành công!')
+              upsert(uploadId, {
+                progress: 100,
+                status: 'done',
+                message: 'Hoàn tất'
+              })
             }
           }
         )
 
-        setState((prev) => ({
-          ...prev,
-          isCompleting: false,
-          isUploading: false,
-          lesson: response
-        }))
+        session.lessonData = response
 
         return response
       } catch (error) {
         const errorMsg = extractErrorMessage(error)
-        setState((prev) => ({
-          ...prev,
-          error: errorMsg,
-          isCompleting: false,
-          isUploading: false
-        }))
+        
+        // Auto-abort session on error
+        if (sessionId) {
+          try {
+            await chunkedUploadService.abortUpload(sessionId)
+          } catch (abortErr) {
+            console.error('Failed to abort session:', abortErr)
+          }
+        }
+        
+        upsert(uploadId, {
+          status: 'error',
+          message: errorMsg,
+          progress: 0
+        })
         toast.error(errorMsg)
         throw error
       }
     },
-    []
+    [upsert]
   )
 
   /**
-   * Abort the entire upload
+   * Cancel a specific upload with API call to abort session
    */
-  const abort = useCallback(async (sessionId: string) => {
-    try {
-      abortControllerRef.current?.abort()
-
-      if (sessionId) {
-        await chunkedUploadService.abortUpload(sessionId)
-      }
-
-      setState(initialState)
-      toast.info('Upload cancelled')
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error)
-      toast.error(errorMsg)
+  const cancelUpload = useCallback((uploadId: string) => {
+    const session = sessionsRef.current.get(uploadId)
+    if (session && session.sessionId) {
+      // Call abort API
+      chunkedUploadService.abortUpload(session.sessionId).catch((err) => {
+        console.error('Failed to abort session:', err)
+      })
     }
+    if (session && session.abortController) {
+      session.abortController.abort()
+    }
+    upsert(uploadId, {
+      status: 'cancelled',
+      message: 'Cancelled by user',
+      progress: 0
+    })
+  }, [upsert])
+
+  /**
+   * Remove upload from the list
+   */
+  const removeUpload = useCallback((uploadId: string) => {
+    sessionsRef.current.delete(uploadId)
+    setUploads((prev) => prev.filter((p) => p.id !== uploadId))
   }, [])
 
   /**
-   * Resume an upload by checking session status
+   * Clear all uploads
    */
-  const resumeSession = useCallback(async (sessionId: string) => {
-    try {
-      const response = await chunkedUploadService.getSession(sessionId)
-
-      if (!response.result) {
-        throw new Error(response.message || 'Session not found')
+  const clearAll = useCallback(() => {
+    sessionsRef.current.forEach((session) => {
+      if (session.abortController) {
+        session.abortController.abort()
       }
-
-      const session = response.result!
-
-      if (session.status === 'EXPIRED' || session.status === 'ABORTED') {
-        throw new Error(`Session is ${session.status}. Please start a new upload.`)
-      }
-
-      setState((prev) => ({
-        ...prev,
-        sessionId,
-        totalSize: session.totalParts * session.chunkSize // Approximate
-      }))
-
-      return session
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error)
-      toast.error(errorMsg)
-      throw error
-    }
+    })
+    sessionsRef.current.clear()
+    setUploads([])
   }, [])
 
   /**
-   * Reset state
+   * Update upload data (for storing metadata like chapterId, title, etc)
    */
-  const reset = useCallback(() => {
-    setState(initialState)
-    abortControllerRef.current?.abort()
+  const updateUploadData = useCallback((uploadId: string, data: any) => {
+    setUploads((prev) =>
+      prev.map((item) =>
+        item.id === uploadId
+          ? { ...item, data: { ...item.data, ...data } }
+          : item
+      )
+    )
   }, [])
 
   return {
-    // State
-    ...state,
-
-    // Actions
+    uploads,
     startUpload,
     uploadChunks,
     completeUpload,
-    abort,
-    resumeSession,
-    reset
+    cancelUpload,
+    removeUpload,
+    clearAll,
+    updateUploadData
   }
 }
