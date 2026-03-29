@@ -6,14 +6,13 @@ import com.freeclassroom.courseservice.dto.request.lesson.ChunkedUploadInitReque
 import com.freeclassroom.courseservice.dto.response.ApiResponse;
 import com.freeclassroom.courseservice.dto.response.lesson.ChunkPresignResponse;
 import com.freeclassroom.courseservice.dto.response.lesson.ChunkedUploadInitResponse;
+import com.freeclassroom.courseservice.dto.response.lesson.LessonDto;
 import com.freeclassroom.courseservice.dto.response.lesson.LessonUploadSessionResponse;
 import com.freeclassroom.courseservice.service.lesson.ILessonUploadService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/lessons/video/v2")
@@ -54,11 +52,15 @@ public class LessonUploadController {
                 .build();
     }
 
-    @PostMapping(value = "/sessions/{sessionId}/complete", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    Flux<ServerSentEvent<String>> completeUpload(@PathVariable String sessionId,
-                                                 @Valid @RequestBody ChunkCompleteRequest request,
-                                                 Authentication authentication) {
-        return lessonUploadService.completeUpload(sessionId, request, authentication.getName());
+    @PostMapping("/sessions/{sessionId}/complete")
+    ApiResponse<LessonDto> completeUpload(@PathVariable String sessionId,
+                                          @Valid @RequestBody ChunkCompleteRequest request,
+                                          Authentication authentication) {
+        LessonDto response = lessonUploadService.completeUpload(sessionId, request, authentication.getName());
+        return ApiResponse.<LessonDto>builder()
+                .message("Hoàn tất upload thành công")
+                .result(response)
+                .build();
     }
 
     @DeleteMapping("/sessions/{sessionId}")

@@ -31,6 +31,9 @@ export interface CompleteUploadRequest {
   title?: string
   content?: string
   duration?: number
+  position?: number
+  isPublic?: boolean
+  fileType: 'video' | 'article'
 }
 
 // === Response Types ===
@@ -64,9 +67,16 @@ export interface SessionResponse {
   totalParts: number
   expiresAt: number // epoch milliseconds
   fileUrl?: string
+  fileType?: 'video' | 'article'
 }
 
 export interface CompleteUploadResponse {
-  lessonId: string
-  message: string
+  id: string
+  title: string
+  content: string
+  duration: number
+  position: number
+  isPublic: boolean
+  type: 'video' | 'article'
+  url: string
 }

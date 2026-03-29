@@ -1,5 +1,6 @@
 package com.freeclassroom.courseservice.dto.response.lesson;
 
+import com.freeclassroom.courseservice.enums.entity.EnumLessonType;
 import com.freeclassroom.courseservice.enums.entity.EnumLessonUploadStatus;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -21,5 +22,5 @@ public class LessonUploadSessionResponse {
     Integer totalParts;
     Long expiresAt;
     String fileUrl;
+    EnumLessonType fileType;
 }
-
