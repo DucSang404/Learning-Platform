@@ -194,6 +194,12 @@ export class LessonAnalysisEvents {
         // Step 1: Map-Reduce summarization
         await this.summaryService.summarizeLesson(lessonId);
 
+        // Notify long-polling HTTP subscribers via Redis pub/sub
+        await redisService.publish(`analysis:${lessonId}`, {
+            lessonId,
+            status: AnalysisOutcome.COMPLETED,
+        });
+
         // Step 2: Fetch all chunks for embedding generation
         Logger.info(
             `[EmbeddingGeneration] Fetching chunks for embedding generation – lessonId=${lessonId}`
@@ -236,11 +242,5 @@ export class LessonAnalysisEvents {
             lessonId,
             chunkCount,
         } satisfies SummarizationCompletedPayload);
-
-        // Notify long-polling HTTP subscribers via Redis pub/sub
-        await redisService.publish(`analysis:${lessonId}`, {
-            lessonId,
-            status: AnalysisOutcome.COMPLETED,
-        });
     }
 }

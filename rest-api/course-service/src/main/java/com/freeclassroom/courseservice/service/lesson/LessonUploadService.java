@@ -7,10 +7,10 @@ import com.freeclassroom.courseservice.dto.request.lesson.ChunkCompleteRequest;
 import com.freeclassroom.courseservice.dto.request.lesson.ChunkPresignRequest;
 import com.freeclassroom.courseservice.dto.request.lesson.ChunkUploadPartRequest;
 import com.freeclassroom.courseservice.dto.request.lesson.ChunkedUploadInitRequest;
-import com.freeclassroom.courseservice.dto.request.lesson.CreationVideoRequest;
 import com.freeclassroom.courseservice.dto.response.ApiResponse;
 import com.freeclassroom.courseservice.dto.response.lesson.ChunkPresignResponse;
 import com.freeclassroom.courseservice.dto.response.lesson.ChunkedUploadInitResponse;
+import com.freeclassroom.courseservice.dto.response.lesson.LessonDto;
 import com.freeclassroom.courseservice.dto.response.lesson.LessonUploadSessionResponse;
 import com.freeclassroom.courseservice.dto.response.lesson.PresignedPartResponse;
 import com.freeclassroom.courseservice.dto.utils.MultipartUploadSession;
@@ -33,10 +33,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import software.amazon.awssdk.services.s3.model.CompletedPart;
 
 import java.time.LocalDateTime;
@@ -137,19 +134,12 @@ public class LessonUploadService implements ILessonUploadService {
     }
 
     @Override
-    public Flux<ServerSentEvent<String>> completeUpload(String sessionId, ChunkCompleteRequest request, String instructorId) {
+    public LessonDto completeUpload(String sessionId, ChunkCompleteRequest request, String instructorId) {
         LessonUploadSessionEntity session = getSessionForInstructor(sessionId, instructorId);
         ensureSessionActive(session);
 
         List<CompletedPart> completedParts = toCompletedParts(request.getParts(), session.getTotalParts());
-
-        return Flux.concat(
-                Mono.just(ServerSentEvent.<String>builder()
-                        .event("saving_db")
-                        .data("{\"message\": \"Upload file thành công, đang lưu dữ liệu còn lại!...\"}")
-                        .build()),
-                Mono.fromCallable(() -> finalizeUpload(session, request, completedParts))
-        );
+        return finalizeUpload(session, request, completedParts);
     }
 
     @Override
@@ -177,6 +167,7 @@ public class LessonUploadService implements ILessonUploadService {
                 .totalParts(session.getTotalParts())
                 .expiresAt(toEpochMillis(session.getExpiresAt()))
                 .fileUrl(session.getFileUrl())
+                .fileType(session.getFileType())
                 .build();
     }
 
@@ -248,51 +239,77 @@ public class LessonUploadService implements ILessonUploadService {
                 .toList();
     }
 
-    private ServerSentEvent<String> finalizeUpload(LessonUploadSessionEntity session,
-                                                  ChunkCompleteRequest request,
-                                                  List<CompletedPart> completedParts) {
+    private LessonDto finalizeUpload(LessonUploadSessionEntity session,
+                                     ChunkCompleteRequest request,
+                                     List<CompletedPart> completedParts) {
+        EnumLessonType lessonType = resolveLessonType(request, session);
         String fileUrl = amazonS3Client.completeMultipartUpload(session.getObjectKey(), session.getUploadId(), completedParts);
 
-        LessonEntity lesson = persistLesson(session, request, fileUrl);
+        LessonEntity lesson = persistLesson(session, request, fileUrl, lessonType);
 
         session.setStatus(EnumLessonUploadStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
+        session.setFileType(lessonType);
         sessionRepository.save(session);
 
-        LessonAnalysisEvent eventMsg = LessonAnalysisEvent.builder()
-                .lessonId(lesson.getId())
-                .fileUrl(lesson.getUrl())
-                .fileType(EnumLessonAnalysisType.video)
-                .build();
-        rabbitTemplate.convertAndSend(RabbitMQConfig.LESSON_ANALYSIS_EXCHANGE, RabbitMQConfig.LESSON_ANALYSIS_ROUTING_KEY, eventMsg);
-
-        return ServerSentEvent.<String>builder()
-                .event("completed")
-                .data("{\"lessonId\": \"" + lesson.getId() + "\", \"message\": \"Bài học đã được tải lên thành công !\"}")
-                .build();
+        publishLessonAnalysisEvent(lesson);
+        return lessonMapper.toDto(lesson);
     }
 
     private LessonEntity persistLesson(LessonUploadSessionEntity session,
                                        ChunkCompleteRequest request,
-                                       String fileUrl) {
+                                       String fileUrl,
+                                       EnumLessonType lessonType) {
         ChapterEntity chapter = chapterRepository.findById(session.getChapterId())
                 .orElseThrow(() -> new CustomExeption(ErrorCode.CHAPTER_NOT_FOUND));
 
-        CreationVideoRequest creationRequest = CreationVideoRequest.builder()
-                .chapterId(session.getChapterId())
+        if (lessonType == null) {
+            throw new CustomExeption(ErrorCode.FILE_TYPE_INVALID);
+        }
+
+        LessonEntity newLesson = LessonEntity.builder()
+                .chapter(chapter)
                 .title(firstNonNull(request.getTitle(), session.getTitle()))
                 .content(firstNonNull(request.getContent(), session.getContent()))
                 .duration(firstNonNull(request.getDuration(), session.getDuration()))
                 .position(firstNonNull(request.getPosition(), session.getPosition()))
                 .isPublic(firstNonNull(request.getIsPublic(), session.getIsPublic()))
+                .type(lessonType)
+                .url(fileUrl)
                 .build();
 
-        LessonEntity newLesson = lessonMapper.ToEntity(creationRequest);
-        newLesson.setChapter(chapter);
-        newLesson.setType(EnumLessonType.video);
-        newLesson.setUrl(fileUrl);
-
         return lessonRepository.save(newLesson);
+    }
+
+    private void publishLessonAnalysisEvent(LessonEntity lesson) {
+        EnumLessonAnalysisType analysisType = mapToAnalysisType(lesson.getType());
+        LessonAnalysisEvent eventMsg = LessonAnalysisEvent.builder()
+                .lessonId(lesson.getId())
+                .fileUrl(lesson.getUrl())
+                .fileType(analysisType)
+                .build();
+        rabbitTemplate.convertAndSend(RabbitMQConfig.LESSON_ANALYSIS_EXCHANGE, RabbitMQConfig.LESSON_ANALYSIS_ROUTING_KEY, eventMsg);
+    }
+
+    private EnumLessonAnalysisType mapToAnalysisType(EnumLessonType lessonType) {
+        if (lessonType == null) {
+            throw new CustomExeption(ErrorCode.FILE_TYPE_INVALID);
+        }
+        try {
+            return EnumLessonAnalysisType.valueOf(lessonType.name());
+        } catch (IllegalArgumentException ex) {
+            throw new CustomExeption(ErrorCode.FILE_TYPE_INVALID);
+        }
+    }
+
+    private EnumLessonType resolveLessonType(ChunkCompleteRequest request, LessonUploadSessionEntity session) {
+        if (request.getFileType() != null) {
+            return request.getFileType();
+        }
+        if (session.getFileType() != null) {
+            return session.getFileType();
+        }
+        throw new CustomExeption(ErrorCode.FILE_TYPE_INVALID);
     }
 
     private long resolveChunkSize(Long requested) {
